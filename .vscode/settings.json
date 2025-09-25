@@ -1,0 +1,31 @@
+{
+    "python.analysis.autoImportCompletions": true,
+    "python.analysis.typeCheckingMode": "off",
+    "python.analysis.autoSearchPaths": true,
+    "python.analysis.extraPaths": [
+        "./raspberry/robot",
+        "./raspberry/robot/dashboard"
+    ],
+    "python.analysis.ignore": [
+        "**/node_modules/**",
+        "**/.venv/**",
+        "**/venv/**",
+        "**/site-packages/**"
+    ],
+    "python.linting.enabled": false,
+    "python.linting.pylintEnabled": false,
+    "python.linting.flake8Enabled": false,
+    "python.linting.mypyEnabled": false,
+    "python.linting.ignorePatterns": [
+        "**/site-packages/**/*.py",
+        ".vscode/*.py",
+        "**/streamlit/**/*.py"
+    ],
+    "files.associations": {
+        "*.py": "python"
+    },
+    "python.analysis.diagnosticMode": "workspace",
+    "python.analysis.stubPath": "./raspberry/stubs",
+    "python.defaultInterpreterPath": "./raspberry/venv/Scripts/python.exe",
+    "python.pythonPath": "./raspberry/venv/Scripts/python.exe"
+}

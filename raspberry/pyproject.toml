@@ -1,0 +1,43 @@
+[tool.black]
+line-length = 120
+target-version = ['py39', 'py310', 'py311']
+
+[tool.isort]
+profile = "black"
+line_length = 120
+
+[tool.mypy]
+python_version = "3.9"
+warn_return_any = false
+warn_unused_configs = true
+disallow_untyped_defs = false
+ignore_missing_imports = true
+
+# Specific module configurations
+[[tool.mypy.overrides]]
+module = [
+    "streamlit",
+    "streamlit.*",
+    "plotly",
+    "plotly.*",
+    "pandas",
+    "numpy"
+]
+ignore_missing_imports = true
+
+[tool.pylint.MASTER]
+ignore = "CVS,.git,__pycache__,.vscode,.venv,venv"
+
+[tool.pylint."MESSAGES CONTROL"]
+disable = [
+    "import-error",
+    "no-member",
+    "invalid-name",
+    "too-few-public-methods",
+    "missing-docstring",
+    "line-too-long"
+]
+
+[build-system]
+requires = ["setuptools>=45", "wheel", "setuptools_scm[toml]>=6.2"]
+build-backend = "setuptools.build_meta"

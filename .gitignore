@@ -1,0 +1,11 @@
+# Python
+__pycache__/
+*.pyc
+
+# Arduino
+arduino/build/
+*.hex
+
+# General
+.DS_Store
+.env

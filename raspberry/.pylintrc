@@ -1,0 +1,35 @@
+[MASTER]
+# Specify a configuration file for pylint
+init-hook='import sys; sys.path.append("./robot")'
+
+# Add files or directories to the blacklist
+ignore=CVS,.git,__pycache__,.vscode,.venv,venv,node_modules
+
+[MESSAGES CONTROL]
+# Disable specific warnings that are common with Streamlit
+disable=
+    import-error,
+    no-member,
+    invalid-name,
+    too-few-public-methods,
+    unused-argument,
+    broad-except,
+    line-too-long,
+    missing-docstring,
+    wrong-import-position,
+    unused-variable
+
+[TYPECHECK]
+# List of module names for which member attributes should not be checked
+ignored-modules=streamlit,plotly,pandas,numpy
+
+# List of class names for which member attributes should not be checked
+ignored-classes=streamlit,st
+
+[FORMAT]
+# Maximum number of characters on a single line.
+max-line-length=120
+
+[DESIGN]
+# Maximum number of arguments for function / method
+max-args=10

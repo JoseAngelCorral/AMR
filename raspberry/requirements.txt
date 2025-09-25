@@ -1,0 +1,16 @@
+# Dependencias del proyecto AMR - Raspberry Pi
+streamlit>=1.28.0
+plotly>=5.15.0
+pandas>=2.0.0
+numpy>=1.24.0
+
+# Para comunicación serie con Arduino
+pyserial>=3.5
+
+# Para procesamiento de imágenes (futuro)
+# opencv-python>=4.8.0
+# Pillow>=10.0.0
+
+# Para navegación y SLAM (futuro)
+# scipy>=1.11.0
+# scikit-learn>=1.3.0
