@@ -13,6 +13,7 @@ import plotly.graph_objects as go  # type: ignore
 import plotly.express as px  # type: ignore
 import pandas as pd  # type: ignore
 from datetime import datetime, timedelta
+import hashlib
 
 # Configuración de la página
 st.set_page_config(
@@ -21,6 +22,219 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
+
+# === SISTEMA DE AUTENTICACIÓN ===
+def hash_password(password: str) -> str:
+    """Hashea la contraseña para almacenamiento seguro"""
+    return hashlib.sha256(password.encode()).hexdigest()
+
+def check_password() -> bool:
+    """Verifica las credenciales del usuario"""
+    
+    # Credenciales del usuario (puedes cambiar estos valores)
+    VALID_USERNAME = "admin"
+    VALID_PASSWORD_HASH = hash_password("amr2024")  # Contraseña: amr2024
+    
+    def password_entered():
+        """Verifica las credenciales ingresadas"""
+        if (st.session_state["username"] == VALID_USERNAME and 
+            hash_password(st.session_state["password"]) == VALID_PASSWORD_HASH):
+            st.session_state["password_correct"] = True
+            del st.session_state["password"]  # Eliminar contraseña de la sesión
+            del st.session_state["username"]   # Eliminar usuario de la sesión
+        else:
+            st.session_state["password_correct"] = False
+
+    # Verificar si ya está autenticado
+    if st.session_state.get("password_correct", False):
+        return True
+
+    # Mostrar pantalla de login
+    st.markdown("""
+    <div style="
+        background: linear-gradient(135deg, #1f4e79 0%, #2980b9 100%);
+        padding: 2rem;
+        border-radius: 15px;
+        text-align: center;
+        margin: 2rem auto;
+        max-width: 400px;
+        box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+    ">
+        <h1 style="color: white; margin: 0 0 1rem 0;">🤖 AMR Dashboard</h1>
+        <p style="color: #ecf0f1; margin: 0;">Sistema de Control del Robot Móvil Autónomo</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # Formulario de login centrado
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        st.markdown("### 🔐 Iniciar Sesión")
+        
+        # Campos de entrada
+        st.text_input("👤 Usuario", key="username", placeholder="Ingrese su usuario")
+        st.text_input("🔑 Contraseña", type="password", key="password", placeholder="Ingrese su contraseña")
+        
+        # Botón de login
+        if st.button("🚀 Acceder", key="login_button", use_container_width=True):
+            password_entered()
+        
+        # Mostrar error si las credenciales son incorrectas
+        if st.session_state.get("password_correct") == False:
+            st.error("❌ Usuario o contraseña incorrectos")
+        
+        # Información de credenciales (solo para demo)
+        with st.expander("ℹ️ Información de acceso"):
+            st.info("**Usuario:** admin\n\n**Contraseña:** amr2024")
+            st.warning("⚠️ Cambia estas credenciales en producción")
+    
+    return False
+
+# Verificar autenticación antes de mostrar el dashboard
+if not check_password():
+    st.stop()
+
+# === SISTEMA DE SEGURIDAD DE SESIÓN ===
+def check_session_security() -> bool:
+    """Verifica la seguridad de la sesión activa"""
+    
+    # Configuración de timeout (en minutos)
+    SESSION_TIMEOUT_MINUTES = 30
+    IDLE_WARNING_MINUTES = 25
+    
+    # Inicializar timestamps de actividad
+    if 'last_activity' not in st.session_state:
+        st.session_state.last_activity = datetime.now()
+    if 'login_time' not in st.session_state:
+        st.session_state.login_time = datetime.now()
+    
+    # Actualizar actividad en cada interacción
+    current_time = datetime.now()
+    
+    # Verificar timeout de sesión
+    time_since_activity = current_time - st.session_state.last_activity
+    time_since_login = current_time - st.session_state.login_time
+    
+    # Auto-logout por inactividad
+    if time_since_activity.total_seconds() > (SESSION_TIMEOUT_MINUTES * 60):
+        st.error(f"⏰ **Sesión expirada por inactividad** ({SESSION_TIMEOUT_MINUTES} min)")
+        st.info("La sesión se cerró automáticamente por seguridad. Por favor, inicie sesión nuevamente.")
+        
+        # Limpiar sesión
+        for key in list(st.session_state.keys()):
+            del st.session_state[key]
+        
+        time.sleep(2)
+        st.rerun()
+        return False
+    
+    # Advertencia de sesión próxima a expirar
+    elif time_since_activity.total_seconds() > (IDLE_WARNING_MINUTES * 60):
+        remaining_minutes = SESSION_TIMEOUT_MINUTES - (time_since_activity.total_seconds() / 60)
+        st.warning(f"⚠️ **Sesión expirará en {remaining_minutes:.1f} minutos por inactividad**")
+        
+        col_extend1, col_extend2, col_extend3 = st.columns([1, 1, 1])
+        with col_extend2:
+            if st.button("🔄 Extender Sesión", key="extend_session"):
+                st.success("✅ Sesión extendida correctamente")
+                st.rerun()
+    
+    return True
+
+# Verificar seguridad de sesión
+if not check_session_security():
+    st.stop()
+
+# === SISTEMA DE DETECCIÓN AUTOMÁTICA DE ACTIVIDAD DEL USUARIO ===
+def setup_activity_detector():
+    """Configura detector JavaScript global de actividad del usuario"""
+    
+    # Inicializar variables de actividad
+    if 'last_activity' not in st.session_state:
+        st.session_state.last_activity = datetime.now()
+    if 'activity_counter' not in st.session_state:
+        st.session_state.activity_counter = 0
+    
+    # JavaScript para detectar actividad del usuario automáticamente
+    st.markdown(f"""
+    <script>
+    // Detector global de actividad del usuario
+    let activityDetected = false;
+    let currentActivityCount = {st.session_state.activity_counter};
+    
+    // Eventos que indican actividad real del usuario
+    const activityEvents = ['click', 'keydown', 'scroll', 'mousemove', 'touchstart'];
+    
+    // Función para detectar actividad
+    function detectActivity() {{
+        if (!activityDetected) {{
+            activityDetected = true;
+            currentActivityCount++;
+            
+            // Enviar señal a Streamlit aumentando el contador
+            window.parent.postMessage({{
+                type: 'streamlit:setComponentValue',
+                key: 'user_activity_detected',
+                value: currentActivityCount
+            }}, '*');
+            
+            // Reset después de 1 segundo para no saturar
+            setTimeout(() => {{ activityDetected = false; }}, 1000);
+        }}
+    }}
+    
+    // Agregar listeners a todos los eventos de actividad
+    activityEvents.forEach(event => {{
+        document.addEventListener(event, detectActivity, true);
+    }});
+    
+    // Detector específico para elementos de Streamlit
+    const observer = new MutationObserver(() => {{
+        // Re-agregar listeners a elementos nuevos
+        activityEvents.forEach(event => {{
+            document.addEventListener(event, detectActivity, true);
+        }});
+    }});
+    
+    observer.observe(document.body, {{ childList: true, subtree: true }});
+    </script>
+    """, unsafe_allow_html=True)
+    
+    # Componente oculto para recibir señales de actividad
+    activity_signal = st.empty()
+    
+    return activity_signal
+
+def check_and_update_activity():
+    """Verifica si hubo actividad y actualiza el timestamp"""
+    
+    # Usar un elemento oculto para detectar cambios de actividad
+    activity_key = f"activity_detector_{int(datetime.now().timestamp())}"
+    
+    # Elemento invisible que JavaScript puede modificar
+    st.markdown(f"""
+    <div id="{activity_key}" style="display: none;">
+        <input type="hidden" id="activity_input_{st.session_state.activity_counter}" 
+               value="{st.session_state.activity_counter}">
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Verificar si el contador cambió (indica actividad)
+    current_counter = st.session_state.get('activity_counter', 0)
+    
+    # Detectar cambios en la URL o query params (indica navegación/interacción)
+    current_time = datetime.now()
+    time_since_last_check = (current_time - st.session_state.get('last_activity_check', current_time)).total_seconds()
+    
+    # Si han pasado menos de 2 segundos desde la última verificación, 
+    # probablemente hay actividad del usuario
+    if time_since_last_check < 2:
+        st.session_state.last_activity = current_time
+    
+    st.session_state.last_activity_check = current_time
+
+# Configurar detector de actividad
+activity_detector = setup_activity_detector()
+check_and_update_activity()
 
 # CSS personalizado para mejorar el aspecto visual
 st.markdown("""
@@ -66,10 +280,14 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# Encabezado principal
-st.markdown("""
+# Encabezado principal con información de usuario
+current_time = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+st.markdown(f"""
 <div class="main-header">
     <h1>🤖 Dashboard - Robot Móvil Autónomo</h1>
+    <div style="text-align: right; margin-top: 10px; font-size: 0.9rem; opacity: 0.9;">
+        📅 {current_time} | 👤 Usuario: <strong>admin</strong>
+    </div>
 </div>
 """, unsafe_allow_html=True)
 
@@ -79,11 +297,76 @@ if 'emergency_stop' not in st.session_state:
 
 # Sidebar para configuración y estado
 with st.sidebar:
+    # Información del usuario y logout
+    st.markdown("### 👤 Sesión de Usuario")
+    col_user, col_logout = st.columns([2, 1])
+    with col_user:
+        st.success("✅ **admin** conectado")
+    with col_logout:
+        if st.button("🚪", help="Cerrar sesión", key="logout_btn"):
+            # Limpiar todas las variables de sesión
+            for key in list(st.session_state.keys()):
+                del st.session_state[key]
+            st.rerun()
+    
+    # Mostrar información de sesión y actividad
+    if 'login_time' not in st.session_state:
+        st.session_state.login_time = datetime.now()
+    if 'last_activity' not in st.session_state:
+        st.session_state.last_activity = datetime.now()
+    
+    current_time = datetime.now()
+    session_duration = current_time - st.session_state.login_time
+    last_activity = current_time - st.session_state.last_activity
+    
+    # Indicadores de estado
+    st.markdown("**📊 Estado de Conexión:**")
+    col_status1, col_status2 = st.columns(2)
+    
+    with col_status1:
+        if last_activity.total_seconds() < 10:
+            st.success("🟢 Activo")
+        elif last_activity.total_seconds() < 60:
+            st.warning("🟡 Inactivo")
+        else:
+            st.error("🔴 Desconectado")
+    
+    with col_status2:
+        # Verificar si auto_refresh está definido
+        auto_refresh_status = st.session_state.get('auto_refresh_enabled', True)
+        if auto_refresh_status:
+            st.info("🔄 Auto-sync")
+        else:
+            st.error("⏸️ Manual")
+    
+    # Información temporal
+    st.caption(f"⏱️ Sesión: {str(session_duration).split('.')[0]}")
+    st.caption(f"🔄 Últ. actividad: {int(last_activity.total_seconds())}s")
+    
+    st.markdown("---")
+    
     st.markdown("### ⚙️ Configuración")
+    
+    # Detectar cambios en configuración
+    prev_auto_refresh = st.session_state.get('prev_auto_refresh', True)
+    prev_refresh_rate = st.session_state.get('prev_refresh_rate', 2)
+    
     auto_refresh = st.checkbox("Actualización automática", value=True)
     refresh_rate = st.slider("Tasa de actualización (seg)", 1, 10, 2)
     
+    # Detectar cambios y actualizar actividad
+    if auto_refresh != prev_auto_refresh or refresh_rate != prev_refresh_rate:
+        st.session_state.prev_auto_refresh = auto_refresh
+        st.session_state.prev_refresh_rate = refresh_rate
+    
+    # Guardar estado del auto_refresh
+    st.session_state.auto_refresh_enabled = auto_refresh
+    
     st.markdown("### 🔧 Modo de operación")
+    
+    # Detectar cambios en modo de operación
+    prev_operation_mode = st.session_state.get('prev_operation_mode', "Manual")
+    
     # Deshabilitar selección de modo si hay parada de emergencia
     if st.session_state.emergency_stop:
         operation_mode = st.selectbox(
@@ -97,6 +380,10 @@ with st.sidebar:
             "Seleccionar modo:",
             ["Manual", "Autónomo", "Patrulla", "Mapeo"]
         )
+    
+    # Detectar cambio de modo
+    if operation_mode != prev_operation_mode:
+        st.session_state.prev_operation_mode = operation_mode
     
     st.markdown("### 📊 Estadísticas del sistema")
     uptime = st.metric("Tiempo activo", "2h 34m")
@@ -425,7 +712,14 @@ elif operation_mode == "Manual":
     # Control de velocidad
     with control_col1:
         st.markdown("### ⚡ Control de Velocidad")
+        
+        # Detectar cambios en velocidad
+        prev_speed = st.session_state.get('prev_speed', 50)
         speed = st.slider("Velocidad (%)", 0, 100, 50)
+        
+        if speed != prev_speed:
+            st.session_state.prev_speed = speed
+        
         st.write(f"Velocidad actual: {speed}%")
     
     with control_col3:
@@ -457,19 +751,30 @@ with col_cam2:
 # === SECCIÓN: LOGS Y EVENTOS ===
 st.markdown("## 📝 Registro de Eventos")
 
-# Generar logs simulados
+# Generar logs simulados (incluye eventos de autenticación)
 current_time = datetime.now()
 logs_data = []
-for i in range(10):
+
+# Agregar evento de login al inicio de los logs
+if 'login_time' in st.session_state:
+    login_time = st.session_state.login_time
+    logs_data.append({
+        "Timestamp": login_time.strftime("%H:%M:%S"),
+        "Tipo": "SUCCESS",
+        "Mensaje": "Usuario 'admin' inició sesión correctamente"
+    })
+
+# Generar logs simulados del sistema
+for i in range(9):  # Reducido a 9 para hacer espacio al log de login
     timestamp = current_time - timedelta(minutes=i*2)
     event_types = ["INFO", "WARNING", "SUCCESS", "DEBUG"]
     event_type = np.random.choice(event_types, p=[0.5, 0.2, 0.2, 0.1])
     
     messages = {
-        "INFO": ["Sistema iniciado correctamente", "Datos de sensores actualizados", "Posición actualizada"],
-        "WARNING": ["Batería baja detectada", "Obstáculo cercano", "Señal débil de GPS"],
-        "SUCCESS": ["Comando ejecutado exitosamente", "Navegación completada", "Calibración finalizada"],
-        "DEBUG": ["Depuración de motores", "Verificación de sensores", "Test de comunicación"]
+        "INFO": ["Sistema iniciado correctamente", "Datos de sensores actualizados", "Posición actualizada", "Conexión con Arduino estable"],
+        "WARNING": ["Batería baja detectada", "Obstáculo cercano", "Señal débil de GPS", "Temperatura alta en motores"],
+        "SUCCESS": ["Comando ejecutado exitosamente", "Navegación completada", "Calibración finalizada", "Mapeo SLAM actualizado"],
+        "DEBUG": ["Depuración de motores", "Verificación de sensores", "Test de comunicación", "Análisis de trayectoria"]
     }
     
     message = np.random.choice(messages[event_type])
@@ -479,21 +784,28 @@ for i in range(10):
         "Mensaje": message
     })
 
+# Ordenar logs por timestamp (más recientes primero)
+logs_data = sorted(logs_data, key=lambda x: x["Timestamp"], reverse=True)
+
 # Mostrar logs en una tabla
 logs_df = pd.DataFrame(logs_data)
 st.dataframe(logs_df, use_container_width=True, hide_index=True)
 
-# === ACTUALIZACIÓN AUTOMÁTICA ===
+# === ACTUALIZACIÓN AUTOMÁTICA CON CONTROL DE ACTIVIDAD ===
+current_time = datetime.now()
+last_activity_seconds = (current_time - st.session_state.last_activity).total_seconds()
+
 if auto_refresh:
-    st.info(f"🔄 Actualización automática activa (cada {refresh_rate}s)")
-    
-    # Método simple y funcional: sleep + rerun
-    # Este enfoque funciona bien para dashboards en tiempo real
-    time.sleep(refresh_rate)
-    st.rerun()
-    
+    # Solo actualizar si el usuario está activo (menos de 5 minutos de inactividad)
+    if last_activity_seconds < 300:  # 5 minutos
+        st.success(f"🔄 Actualización automática activa (cada {refresh_rate}s) - Usuario activo")
+        time.sleep(refresh_rate)
+        st.rerun()
+    else:
+        st.warning(f"⏸️ Actualización pausada por inactividad ({int(last_activity_seconds/60)} min)")
+        st.info("💡 Interactúa con el dashboard para reactivar la actualización automática")
 else:
-    st.info("⏸️ Actualización automática desactivada")
+    st.info("⏸️ Actualización automática desactivada por el usuario")
 
 # Botón de actualización manual
 st.markdown("---")
