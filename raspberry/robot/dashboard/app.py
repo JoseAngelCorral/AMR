@@ -75,7 +75,7 @@ def check_password() -> bool:
         st.text_input("🔑 Contraseña", type="password", key="password", placeholder="Ingrese su contraseña")
         
         # Botón de login
-        if st.button("🚀 Acceder", key="login_button", use_container_width=True):
+        if st.button("🚀 Acceder", key="login_button", width="stretch"):
             password_entered()
         
         # Mostrar error si las credenciales son incorrectas
@@ -629,7 +629,7 @@ col_lidar, col_trajectory = st.columns(2)
 with col_lidar:
     try:
         lidar_fig = create_lidar_plot(robot_data['sensors']['lidar'])
-        st.plotly_chart(lidar_fig, use_container_width=True)
+        st.plotly_chart(lidar_fig, width="stretch")
     except:
         st.error("Error al cargar gráfico LIDAR - Se requiere instalación de plotly")
         st.write("**Datos LIDAR:**", robot_data['sensors']['lidar'])
@@ -637,7 +637,7 @@ with col_lidar:
 with col_trajectory:
     try:
         traj_fig = create_trajectory_plot(robot_data['position'])
-        st.plotly_chart(traj_fig, use_container_width=True)
+        st.plotly_chart(traj_fig, width="stretch")
     except:
         st.error("Error al cargar gráfico de trayectoria - Se requiere instalación de plotly")
         st.write(f"**Posición actual:** X={robot_data['position']['x']:.2f}m, Y={robot_data['position']['y']:.2f}m")
@@ -789,7 +789,7 @@ logs_data = sorted(logs_data, key=lambda x: x["Timestamp"], reverse=True)
 
 # Mostrar logs en una tabla
 logs_df = pd.DataFrame(logs_data)
-st.dataframe(logs_df, use_container_width=True, hide_index=True)
+st.dataframe(logs_df, width="stretch", hide_index=True)
 
 # === ACTUALIZACIÓN AUTOMÁTICA CON CONTROL DE ACTIVIDAD ===
 current_time = datetime.now()
@@ -811,6 +811,6 @@ else:
 st.markdown("---")
 col_refresh1, col_refresh2, col_refresh3 = st.columns([1, 1, 1])
 with col_refresh2:
-    if st.button("🔄 Actualizar Datos", key="manual_update", help="Actualizar datos manualmente", use_container_width=True):
+    if st.button("🔄 Actualizar Datos", key="manual_update", help="Actualizar datos manualmente", width="stretch"):
         st.success("¡Datos actualizados!")
         st.rerun()
