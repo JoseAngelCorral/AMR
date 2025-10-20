@@ -19,14 +19,7 @@ void Odometry::init(float startX, float startY, float startTheta) {
     lastLeftPulses = encoder->readLeft();
     lastRightPulses = encoder->readRight();
     
-    Serial.println("=== Odometría Inicializada ===");
-    Serial.print("Posición inicial: (");
-    Serial.print(x, 2);
-    Serial.print(", ");
-    Serial.print(y, 2);
-    Serial.print(") Ángulo: ");
-    Serial.print(startTheta, 1);
-    Serial.println("°");
+    Serial.println(F("Odo OK"));
 }
 
 void Odometry::update() {
@@ -86,15 +79,13 @@ void Odometry::resetPosition() {
 }
 
 void Odometry::printPosition() {
-    Serial.print("Posición: (");
-    Serial.print(x, 2);
-    Serial.print(", ");
-    Serial.print(y, 2);
-    Serial.print(") cm, Ángulo: ");
-    Serial.print(radiansToDegrees(theta), 1);
-    Serial.print("°, Distancia del origen: ");
-    Serial.print(getDistanceFromOrigin(), 2);
-    Serial.println(" cm");
+    Serial.print(F("("));
+    Serial.print(x, 1);
+    Serial.print(F(","));
+    Serial.print(y, 1);
+    Serial.print(F(") "));
+    Serial.print(radiansToDegrees(theta), 0);
+    Serial.println(F("°"));
 }
 
 float Odometry::getDistanceFromOrigin() {

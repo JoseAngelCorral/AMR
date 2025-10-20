@@ -11,23 +11,15 @@ void Encoder::init() {
     pinMode(ENCODER_RIGHT_A_PIN, INPUT_PULLUP);
     pinMode(ENCODER_RIGHT_B_PIN, INPUT_PULLUP);
     
-    // Configurar interrupciones para Arduino Uno (INT0 = pin 2, INT1 = pin 3)
-    attachInterrupt(0, leftEncoderISR, CHANGE);   // INT0 en pin 2
-    attachInterrupt(1, rightEncoderISR, CHANGE);  // INT1 en pin 3
+    // Configurar interrupciones para Arduino Uno 
+    // Solo pin 2 (INT0) y pin 3 (INT1) soportan interrupciones
+    attachInterrupt(1, leftEncoderISR, CHANGE);   // INT1 en pin 3 (Left B)
+    attachInterrupt(0, rightEncoderISR, CHANGE);  // INT0 en pin 2 (Right B)
     
     // Reset contadores
     resetBoth();
     
-    Serial.println("=== Encoder E386G5 Inicializado ===");
-    Serial.println("Configuración:");
-    Serial.print("- Pulsos por revolución: ");
-    Serial.println(PULSES_PER_REVOLUTION);
-    Serial.print("- Diámetro de rueda: ");
-    Serial.print(WHEEL_DIAMETER_CM);
-    Serial.println(" cm");
-    Serial.print("- Circunferencia: ");
-    Serial.print(WHEEL_CIRCUMFERENCE_CM);
-    Serial.println(" cm");
+    Serial.println(F("Enc OK 1200PPR"));
 }
 
 long Encoder::readLeft() {

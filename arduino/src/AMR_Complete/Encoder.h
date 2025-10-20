@@ -10,11 +10,11 @@
 #define WHEEL_DIAMETER_CM 16.0       // Diámetro de la rueda en centímetros
 #define WHEEL_CIRCUMFERENCE_CM (PI * WHEEL_DIAMETER_CM)  // Circunferencia en cm
 
-// Pines para Arduino Uno (solo tiene interrupciones en pines 2 y 3)
-#define ENCODER_LEFT_A_PIN 2         // Pin A del encoder izquierdo (INT0)
-#define ENCODER_LEFT_B_PIN 4         // Pin B del encoder izquierdo
-#define ENCODER_RIGHT_A_PIN 3        // Pin A del encoder derecho (INT1) 
-#define ENCODER_RIGHT_B_PIN 5        // Pin B del encoder derecho
+// Pines para Arduino Uno - Configuración personalizada
+#define ENCODER_LEFT_A_PIN 13        // Pin A del encoder izquierdo
+#define ENCODER_LEFT_B_PIN 3         // Pin B del encoder izquierdo (INT1)
+#define ENCODER_RIGHT_A_PIN 12       // Pin A del encoder derecho
+#define ENCODER_RIGHT_B_PIN 2        // Pin B del encoder derecho (INT0)
 
 class Encoder {
 private:
