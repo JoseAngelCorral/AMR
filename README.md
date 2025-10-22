@@ -177,6 +177,7 @@ AMR/
 
 ## 🎯 Características Implementadas
 
+### Sistema Base:
 - ✅ Control bidireccional de motores
 - ✅ Odometría diferencial en tiempo real  
 - ✅ Giros automáticos de 90° con feedback
@@ -186,15 +187,26 @@ AMR/
 - ✅ Gestión de memoria optimizada
 - ✅ Manejo de interrupciones para encoders
 
+### Navegación Autónoma (NUEVO):
+- ✅ **Bug Algorithm** implementado
+- ✅ 5 Sensores IR (2 laterales, 3 frontales)
+- ✅ Detección y evasión de obstáculos
+- ✅ Seguimiento de paredes
+- ✅ Máquina de estados con 7 estados
+- ✅ Calibración automática de sensores
+- ✅ Modo exploratorio autónomo
+
 ## 🔮 Desarrollo Futuro
 
 ### Próximas características:
 - [ ] Integración con Raspberry Pi
 - [ ] Control remoto WiFi/Bluetooth
-- [ ] Navegación autónoma con sensores
+- [x] ~~Navegación autónoma con sensores~~ ✅ **IMPLEMENTADO: Bug Algorithm**
 - [ ] Mapeo y localización (SLAM)
 - [ ] Interface web de control
 - [ ] Integración con sensores adicionales (LiDAR, cámara)
+- [ ] Mejoras al Bug Algorithm: Bug2 con línea M (goal-to-start)
+- [ ] Path planning avanzado con waypoints
 
 ## 📞 Contacto y Soporte
 
@@ -209,5 +221,5 @@ Este proyecto está bajo licencia MIT. Ver archivo LICENSE para más detalles.
 ---
 
 **Última actualización**: Octubre 2025  
-**Versión del firmware**: v1.0  
+**Versión del firmware**: v1.1 (Bug Algorithm implementado)  
 **Estado**: Funcional y operativo ✅
