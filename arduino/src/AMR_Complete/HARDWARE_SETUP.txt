@@ -1,0 +1,214 @@
+╔═══════════════════════════════════════════════════════════════════════════╗
+║                   AMR HARDWARE SETUP - Bug Algorithm                      ║
+║                          Complete Pin Mapping                             ║
+╚═══════════════════════════════════════════════════════════════════════════╝
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│                          ARDUINO UNO                                     │
+│                                                                          │
+│  ╔══════════════════════════════════════════════════════════════╗       │
+│  ║                     Digital Pins                             ║       │
+│  ║                                                              ║       │
+│  ║  Pin 2  (INT0)  ←→  Encoder Derecho B                      ║       │
+│  ║  Pin 3  (INT1)  ←→  Encoder Izquierdo B                    ║       │
+│  ║  Pin 5  (PWM)   ←→  Motor Derecho RPWM (Atrás)             ║       │
+│  ║  Pin 6  (PWM)   ←→  Motor Derecho LPWM (Adelante)          ║       │
+│  ║  Pin 10 (PWM)   ←→  Motor Izquierdo RPWM (Atrás)           ║       │
+│  ║  Pin 11 (PWM)   ←→  Motor Izquierdo LPWM (Adelante)        ║       │
+│  ║  Pin 12         ←→  Encoder Derecho A                       ║       │
+│  ║  Pin 13         ←→  Encoder Izquierdo A                     ║       │
+│  ╚══════════════════════════════════════════════════════════════╝       │
+│                                                                          │
+│  ╔══════════════════════════════════════════════════════════════╗       │
+│  ║                    Analog Pins (NEW!)                        ║       │
+│  ║                                                              ║       │
+│  ║  Pin A0  ←→  Sensor IR Lateral Izquierdo                   ║       │
+│  ║  Pin A1  ←→  Sensor IR Lateral Derecho                     ║       │
+│  ║  Pin A2  ←→  Sensor IR Frontal Izquierdo                   ║       │
+│  ║  Pin A3  ←→  Sensor IR Frontal Centro                      ║       │
+│  ║  Pin A4  ←→  Sensor IR Frontal Derecho                     ║       │
+│  ╚══════════════════════════════════════════════════════════════╝       │
+└─────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│                     ROBOT PHYSICAL LAYOUT                                │
+│                                                                          │
+│                 [IR-FL]     [IR-FC]     [IR-FR]                         │
+│                   (A2)        (A3)        (A4)                          │
+│                     ↓          ↓          ↓                             │
+│              ┌──────┴──────────┴──────────┴─────┐                      │
+│              │                                   │                      │
+│   [IR-LS] → │                                   │ ← [IR-RS]            │
+│     (A0)    │            AMR ROBOT              │    (A1)              │
+│             │                                   │                      │
+│             │   ┌─────────┐     ┌─────────┐    │                      │
+│             │   │ Motor   │     │ Motor   │    │                      │
+│             │   │ Izq+Enc │     │ Der+Enc │    │                      │
+│             │   └─────────┘     └─────────┘    │                      │
+│             │                                   │                      │
+│             │      [Arduino Uno + BTS7960]      │                      │
+│             │                                   │                      │
+│             └───────────────────────────────────┘                      │
+│                                                                          │
+│  Legend:                                                                 │
+│  IR-FL = Infrared Frontal Left        IR-FC = Infrared Frontal Center  │
+│  IR-FR = Infrared Frontal Right       IR-LS = Infrared Lateral Side    │
+│  IR-RS = Infrared Lateral Side        Enc = Encoder E386G5             │
+└─────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│                    COMPONENT CONNECTIONS                                 │
+└─────────────────────────────────────────────────────────────────────────┘
+
+╔═══════════════════════════════════════════════════════════════════════╗
+║ ENCODERS (E386G5 - 1200 PPR)                                          ║
+╠═══════════════════════════════════════════════════════════════════════╣
+║                                                                        ║
+║  Encoder Izquierdo:                    Encoder Derecho:               ║
+║  ┌──────────────────┐                 ┌──────────────────┐           ║
+║  │ Pin A → Pin 13   │                 │ Pin A → Pin 12   │           ║
+║  │ Pin B → Pin 3    │ (INT1)          │ Pin B → Pin 2    │ (INT0)    ║
+║  │ VCC   → 5V       │                 │ VCC   → 5V       │           ║
+║  │ GND   → GND      │                 │ GND   → GND      │           ║
+║  └──────────────────┘                 └──────────────────┘           ║
+║                                                                        ║
+╚═══════════════════════════════════════════════════════════════════════╝
+
+╔═══════════════════════════════════════════════════════════════════════╗
+║ MOTOR DRIVERS (BTS7960 - 43A max)                                     ║
+╠═══════════════════════════════════════════════════════════════════════╣
+║                                                                        ║
+║  Motor Izquierdo (BTS7960 #1):         Motor Derecho (BTS7960 #2):   ║
+║  ┌──────────────────┐                 ┌──────────────────┐           ║
+║  │ RPWM → Pin 10    │ (Atrás)         │ RPWM → Pin 5     │ (Atrás)   ║
+║  │ LPWM → Pin 11    │ (Adelante)      │ LPWM → Pin 6     │ (Adelante)║
+║  │ REN  → VCC Ext   │ (Always HIGH)   │ REN  → VCC Ext   │           ║
+║  │ LEN  → VCC Ext   │ (Always HIGH)   │ LEN  → VCC Ext   │           ║
+║  │ VCC  → 5V        │                 │ VCC  → 5V        │           ║
+║  │ GND  → GND       │                 │ GND  → GND       │           ║
+║  │ B+   → Motor+    │                 │ B+   → Motor+    │           ║
+║  │ B-   → Motor-    │                 │ B-   → Motor-    │           ║
+║  │ VMS  → 12-24V    │ (Power supply)  │ VMS  → 12-24V    │           ║
+║  └──────────────────┘                 └──────────────────┘           ║
+║                                                                        ║
+╚═══════════════════════════════════════════════════════════════════════╝
+
+╔═══════════════════════════════════════════════════════════════════════╗
+║ INFRARED SENSORS (5 total) - NEW!                                     ║
+╠═══════════════════════════════════════════════════════════════════════╣
+║                                                                        ║
+║  All IR Sensors (identical connections):                              ║
+║  ┌──────────────────┐                                                 ║
+║  │ VCC → 5V         │                                                 ║
+║  │ GND → GND        │                                                 ║
+║  │ OUT → Analog Pin │ (see pin mapping above)                        ║
+║  └──────────────────┘                                                 ║
+║                                                                        ║
+║  Sensor Positions:                                                    ║
+║  • A0 - Lateral Izquierdo (detects walls/obstacles on left)          ║
+║  • A1 - Lateral Derecho (detects walls/obstacles on right)           ║
+║  • A2 - Frontal Izquierdo (detects obstacles ahead-left)             ║
+║  • A3 - Frontal Centro (detects obstacles straight ahead)            ║
+║  • A4 - Frontal Derecho (detects obstacles ahead-right)              ║
+║                                                                        ║
+║  Recommended Models:                                                  ║
+║  • Sharp GP2Y0A21YK (10-80cm range, analog output)                   ║
+║  • TCRT5000 (short range, digital/analog output)                     ║
+║  • Any IR proximity sensor with analog output                        ║
+║                                                                        ║
+╚═══════════════════════════════════════════════════════════════════════╝
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│                        POWER SUPPLY                                      │
+└─────────────────────────────────────────────────────────────────────────┘
+
+  ┌──────────────┐
+  │   Arduino    │  ← USB (5V) or DC Jack (7-12V)
+  │     Uno      │
+  └──────────────┘
+         │
+         ├─→ 5V  → Encoders (2x)
+         ├─→ 5V  → BTS7960 Logic (2x)
+         ├─→ 5V  → IR Sensors (5x)
+         └─→ GND → Common Ground
+  
+  ┌──────────────┐
+  │  12-24V DC   │  ← External Power Supply for Motors
+  │Power Supply  │
+  └──────────────┘
+         │
+         ├─→ +12/24V → BTS7960 #1 Motor Power (VMS)
+         ├─→ +12/24V → BTS7960 #2 Motor Power (VMS)
+         └─→ GND     → Common Ground (IMPORTANT!)
+
+  ⚠️  IMPORTANT: All grounds must be connected together!
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│                     WIRING CHECKLIST                                     │
+└─────────────────────────────────────────────────────────────────────────┘
+
+  Digital Connections:
+  [ ] Pin 2  → Encoder Derecho B
+  [ ] Pin 3  → Encoder Izquierdo B
+  [ ] Pin 5  → Motor Derecho RPWM
+  [ ] Pin 6  → Motor Derecho LPWM
+  [ ] Pin 10 → Motor Izquierdo RPWM
+  [ ] Pin 11 → Motor Izquierdo LPWM
+  [ ] Pin 12 → Encoder Derecho A
+  [ ] Pin 13 → Encoder Izquierdo A
+
+  Analog Connections (IR Sensors):
+  [ ] Pin A0 → IR Lateral Izquierdo
+  [ ] Pin A1 → IR Lateral Derecho
+  [ ] Pin A2 → IR Frontal Izquierdo
+  [ ] Pin A3 → IR Frontal Centro
+  [ ] Pin A4 → IR Frontal Derecho
+
+  Power:
+  [ ] Arduino USB/DC connected
+  [ ] 5V to all components
+  [ ] 12-24V to motor drivers
+  [ ] All grounds connected
+  [ ] BTS7960 enables powered externally
+
+  Verification:
+  [ ] Upload code successfully
+  [ ] Send 'T' to test motors
+  [ ] Send 'I' to check IR sensors
+  [ ] Send 'P' to verify encoders
+  [ ] Send 'C' to calibrate IR
+  [ ] Send 'B' to test Bug Algorithm
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│                          NEXT STEPS                                      │
+└─────────────────────────────────────────────────────────────────────────┘
+
+  1. Complete physical wiring according to diagram above
+  2. Upload AMR_Complete.ino to Arduino Uno
+  3. Open Serial Monitor at 115200 baud
+  4. Run diagnostics: 'T' (motors), 'I' (sensors)
+  5. Calibrate IR sensors with 'C' command
+  6. Adjust thresholds in InfraredSensor.h if needed
+  7. Test Bug Algorithm with 'B' command in safe area
+  8. Monitor state transitions with 'G' command
+  9. Use 'X' for emergency stop at any time
+
+  See BUG_ALGORITHM_GUIDE.md for detailed usage instructions!
+
+╔═══════════════════════════════════════════════════════════════════════╗
+║                         SAFETY NOTES                                   ║
+╠═══════════════════════════════════════════════════════════════════════╣
+║                                                                        ║
+║  ⚠️  Always test in safe environment with emergency stop ready        ║
+║  ⚠️  Start with low speeds, increase gradually                        ║
+║  ⚠️  Verify all connections before applying power                     ║
+║  ⚠️  Keep 'X' command ready for emergency stop                        ║
+║  ⚠️  Monitor battery voltage to prevent brownouts                     ║
+║  ⚠️  Ensure adequate clearance around robot                           ║
+║                                                                        ║
+╚═══════════════════════════════════════════════════════════════════════╝
+
+════════════════════════════════════════════════════════════════════════════
+     AMR Project - Bug Algorithm Implementation Complete ✅
+     Version: 1.1 | Date: October 2025
+════════════════════════════════════════════════════════════════════════════
