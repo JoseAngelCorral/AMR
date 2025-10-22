@@ -8,6 +8,7 @@
  * - Encoder E386G5 (400 PPR × 3 = 1200 PPR)
  * - Driver BTS7960 para motores (43A máx)
  * - Ruedas 16cm diámetro
+ * - 5 Sensores IR (2 laterales, 3 frontales) en A0-A4
  * 
  * CONTROLES SERIE:
  * W = Adelante    S = Atrás
@@ -15,6 +16,8 @@
  * X = Parar       R = Reset posición
  * P = Mostrar posición
  * T = Test motores M = Diagnóstico motor derecho
+ * B = Bug Algorithm ON/OFF  I = Info sensores IR
+ * C = Calibrar IR  G = Estado Bug Algorithm
  * 
  * CONEXIONES:
  * Encoder Izq:  A=Pin13, B=Pin3 (INT1)
@@ -22,6 +25,8 @@
  * Motor Izq:    RPWM=Pin10, LPWM=Pin11 (LPWM=Adelante)
  * Motor Der:    RPWM=Pin5, LPWM=Pin6 (LPWM=Adelante)
  * Enables:      Alimentación externa (siempre HIGH)
+ * IR Lateral Izq: A0    IR Lateral Der: A1
+ * IR Frontal Izq: A2    IR Frontal Centro: A3    IR Frontal Der: A4
  */
 
 // ========================================
@@ -31,6 +36,8 @@
 #include "MotorDriver.h"
 #include "Encoder.h"
 #include "Odometry.h"
+#include "InfraredSensor.h"
+#include "BugAlgorithm.h"
 
 // ========================================
 //         INSTANCIAS GLOBALES
@@ -38,6 +45,8 @@
 MotorDriver motors;
 Encoder encoders;
 Odometry odometry(&encoders);
+InfraredSensor irSensors;
+BugAlgorithm bugAlgo(&irSensors, &motors, &odometry);
 
 // ========================================
 //         VARIABLES DE CONTROL
@@ -63,11 +72,14 @@ void setup() {
     Serial.println(F("W/S:Adelante/Atras"));
     Serial.println(F("A/D:Izq/Der X:Stop"));
     Serial.println(F("P:Pos R:Reset T:Test"));
+    Serial.println(F("B:Bug Algo I:Info IR"));
     
     // Inicializar hardware
     motors.init();
     encoders.init();
     odometry.init(0.0, 0.0, 0.0);
+    irSensors.init();
+    bugAlgo.init();
     
     Serial.println(F("LISTO! Pos:(0,0)"));
 }
@@ -83,8 +95,11 @@ void loop() {
         lastPositionUpdate = millis();
     }
     
-    // Procesar comandos serie
-    if (Serial.available()) {
+    // Actualizar Bug Algorithm (si está activo)
+    bugAlgo.update();
+    
+    // Procesar comandos serie (solo si bug algorithm no está activo)
+    if (Serial.available() && !bugAlgo.isRunning()) {
         char command = Serial.read();
         processCommand(command);
         
@@ -92,10 +107,22 @@ void loop() {
         while (Serial.available()) {
             Serial.read();
         }
+    } else if (Serial.available() && bugAlgo.isRunning()) {
+        // Si bug algorithm está activo, solo permitir comandos de control
+        char command = Serial.read();
+        if (command == 'B' || command == 'b' || command == 'X' || command == 'x') {
+            processCommand(command);
+        }
+        // Limpiar buffer
+        while (Serial.available()) {
+            Serial.read();
+        }
     }
     
-    // Manejar giros automáticos
-    handleAutoTurn();
+    // Manejar giros automáticos (solo si bug algorithm no está activo)
+    if (!bugAlgo.isRunning()) {
+        handleAutoTurn();
+    }
     
     delay(5); // Pequeña pausa para estabilidad
 }
@@ -162,6 +189,32 @@ void processCommand(char cmd) {
         case 'M':
             Serial.println(F("Diag Der"));
             motors.testRightMotor();
+            break;
+            
+        case 'B':
+            // Activar/Desactivar Bug Algorithm
+            if (bugAlgo.isRunning()) {
+                bugAlgo.stop();
+            } else {
+                bugAlgo.start();
+            }
+            break;
+            
+        case 'I':
+            // Información de sensores IR
+            irSensors.readAllSensors();
+            irSensors.printSensorValues();
+            break;
+            
+        case 'C':
+            // Calibración de sensores IR
+            irSensors.readAllSensors();
+            irSensors.calibrate();
+            break;
+            
+        case 'G':
+            // Estado del Bug Algorithm
+            bugAlgo.printStatus();
             break;
             
         case '\r':
@@ -238,6 +291,9 @@ void showHelp() {
     Serial.println(F("A/D:Izq/Der 90"));
     Serial.println(F("X:Stop P:Pos R:Reset"));
     Serial.println(F("T:Test M:DiagDer"));
+    Serial.println(F("B:Bug Algo On/Off"));
+    Serial.println(F("I:Info IR C:Calib IR"));
+    Serial.println(F("G:Estado Bug Algo"));
     odometry.printPosition();
 }
 
