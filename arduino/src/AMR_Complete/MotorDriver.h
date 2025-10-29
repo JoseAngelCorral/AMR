@@ -16,9 +16,10 @@
 #define MOTOR_RIGHT_LPWM 6   // PWM Atrás motor derecho
 // REN y LEN: Alimentación externa (siempre HIGH)
 
-// Velocidades para BTS7960 (más potente que L298N)
-#define DEFAULT_SPEED 180    // Velocidad por defecto (0-255)
-#define TURN_SPEED 150       // Velocidad para giros
+#// Velocidades para BTS7960 (más potente que L298N)
+#// Valores ajustados: ver README/AMR_Complete para porcentajes
+#define DEFAULT_SPEED 170    // Velocidad por defecto (0-255)
+#define TURN_SPEED 140       // Velocidad para giros
 #define MAX_SPEED 255        // Velocidad máxima
 #define MIN_SPEED 80         // Velocidad mínima para superar fricción
 

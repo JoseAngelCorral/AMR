@@ -3,6 +3,8 @@
 // Inicialización de variables estáticas
 volatile long Encoder::leftPulses = 0;
 volatile long Encoder::rightPulses = 0;
+// Pulses per revolution (runtime adjustable). Start from default measured value.
+int Encoder::pulsesPerRevolution = DEFAULT_PULSES_PER_REVOLUTION;
 
 void Encoder::init() {
     // Configurar pines como entrada con pull-up interno
@@ -11,15 +13,37 @@ void Encoder::init() {
     pinMode(ENCODER_RIGHT_A_PIN, INPUT_PULLUP);
     pinMode(ENCODER_RIGHT_B_PIN, INPUT_PULLUP);
     
-    // Configurar interrupciones para Arduino Uno 
-    // Solo pin 2 (INT0) y pin 3 (INT1) soportan interrupciones
-    attachInterrupt(1, leftEncoderISR, CHANGE);   // INT1 en pin 3 (Left B)
-    attachInterrupt(0, rightEncoderISR, CHANGE);  // INT0 en pin 2 (Right B)
+    // Configurar interrupciones para Arduino Uno
+    // Usar digitalPinToInterrupt para enlazar ISRs a los pines B configurados.
+    int intLeft = digitalPinToInterrupt(ENCODER_LEFT_B_PIN);
+    int intRight = digitalPinToInterrupt(ENCODER_RIGHT_B_PIN);
+    if (intLeft == NOT_AN_INTERRUPT || intRight == NOT_AN_INTERRUPT) {
+        Serial.print(F("Warning: encoder B pin not an interrupt: L_B=")); Serial.print(ENCODER_LEFT_B_PIN);
+        Serial.print(F(" R_B=")); Serial.println(ENCODER_RIGHT_B_PIN);
+    }
+    attachInterrupt(intLeft, leftEncoderISR, CHANGE);
+    attachInterrupt(intRight, rightEncoderISR, CHANGE);
     
     // Reset contadores
     resetBoth();
     
-    Serial.println(F("Enc OK 1200PPR"));
+    Serial.print(F("Enc OK "));
+    Serial.print(Encoder::pulsesPerRevolution);
+    Serial.print(F(" PPR "));
+    Serial.print(F("Pins L_A:")); Serial.print(ENCODER_LEFT_A_PIN);
+    Serial.print(F(" L_B:")); Serial.print(ENCODER_LEFT_B_PIN);
+    Serial.print(F(" R_A:")); Serial.print(ENCODER_RIGHT_A_PIN);
+    Serial.print(F(" R_B:")); Serial.println(ENCODER_RIGHT_B_PIN);
+
+    // Imprimir información de calibración útil
+    float cmPerPulse = WHEEL_CIRCUMFERENCE_CM / (float)Encoder::pulsesPerRevolution;
+    Serial.print(F("cm/pulse:")); Serial.println(cmPerPulse, 6);
+    // grados por tic cuando solo una rueda avanza (rad = cm_per_pulse / wheel_base)
+    float degPerPulseSingle = (cmPerPulse / (float)WHEEL_BASE_CM) * 180.0 / PI;
+    Serial.print(F("deg/pulse(single):")); Serial.println(degPerPulseSingle, 6);
+    // grados por par de tics opuestos (una rueda adelante, otra atras)
+    float degPerPulsePair = (2.0 * cmPerPulse / (float)WHEEL_BASE_CM) * 180.0 / PI;
+    Serial.print(F("deg/pulse(pair):")); Serial.println(degPerPulsePair, 6);
 }
 
 long Encoder::readLeft() {
@@ -60,14 +84,18 @@ void Encoder::resetBoth() {
 float Encoder::pulsesToCentimeters(long pulses) {
     // Convertir pulsos a distancia en centímetros
     // Distancia = (pulsos / pulsos_por_revolución) * circunferencia
-    float revolutions = (float)pulses / PULSES_PER_REVOLUTION;
+    float revolutions = (float)pulses / (float)Encoder::pulsesPerRevolution;
     return revolutions * WHEEL_CIRCUMFERENCE_CM;
 }
 
 float Encoder::pulsesToRevolutions(long pulses) {
     // Convertir pulsos a revoluciones
-    return (float)pulses / PULSES_PER_REVOLUTION;
+    return (float)pulses / (float)Encoder::pulsesPerRevolution;
 }
+
+// Getter/Setter for runtime pulses/revolution
+int Encoder::getPulsesPerRevolution() { return pulsesPerRevolution; }
+void Encoder::setPulsesPerRevolution(int v) { if (v > 0) pulsesPerRevolution = v; }
 
 float Encoder::getLeftDistanceCm() {
     return pulsesToCentimeters(readLeft());

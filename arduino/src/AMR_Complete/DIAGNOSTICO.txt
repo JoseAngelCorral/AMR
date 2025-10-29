@@ -44,8 +44,8 @@
 // CONFIGURACIONES COMUNES A AJUSTAR:
 
 // En MotorDriver.h - Velocidades:
-// #define DEFAULT_SPEED 200    // Subir si va muy lento  
-// #define TURN_SPEED 170       // Velocidad de giro
+// #define DEFAULT_SPEED 170    // Subir si va muy lento  
+// #define TURN_SPEED 140       // Velocidad de giro
 // #define MIN_SPEED 100        // Mínimo para superar fricción
 
 // Si direcciones están invertidas, intercambiar estas líneas 

@@ -5,21 +5,38 @@
 
 #include <Arduino.h>
 
-// Configuración del encoder E386G5 con triplicador
-#define PULSES_PER_REVOLUTION 1200   // E386G5 (400 PPR) × 3 = 1200 pulsos por revolución
-#define WHEEL_DIAMETER_CM 16.0       // Diámetro de la rueda en centímetros
+// Configuración del encoder
+// Observación: durante la inspección los contadores mostraron ~3389-3446 pulsos
+// por vuelta. Para reflejar el valor real medido ajustamos PULSES_PER_REVOLUTION
+// a ese valor promedio. Si calibras de nuevo, actualiza este número.
+#define DEFAULT_PULSES_PER_REVOLUTION 2950  // Valor por defecto (ajústalo si calibras)
+#define WHEEL_DIAMETER_CM 15.50       // Diámetro de la rueda en centímetros
 #define WHEEL_CIRCUMFERENCE_CM (PI * WHEEL_DIAMETER_CM)  // Circunferencia en cm
 
+// Wheel base (centro a centro). If not defined elsewhere, provide a default
+// so encoder init can compute deg/pulse for diagnostics. The canonical
+// definition lives in Odometry.h; this is only a safe fallback for builds.
+#ifndef WHEEL_BASE_CM
+#define WHEEL_BASE_CM 63.5
+#endif
+
 // Pines para Arduino Uno - Configuración personalizada
-#define ENCODER_LEFT_A_PIN 13        // Pin A del encoder izquierdo
-#define ENCODER_LEFT_B_PIN 3         // Pin B del encoder izquierdo (INT1)
-#define ENCODER_RIGHT_A_PIN 12       // Pin A del encoder derecho
-#define ENCODER_RIGHT_B_PIN 2        // Pin B del encoder derecho (INT0)
+// Asignación solicitada:
+// Encoder IZQ: A = 8, B = 2
+// Encoder DER: A = 9, B = 3
+// Nota: en Arduino UNO sólo los pines 2 y 3 soportan interrupciones externas
+// (INT0/INT1). Por eso las señales B deben ir a 2 o 3.
+#define ENCODER_LEFT_A_PIN 8         // Pin A del encoder izquierdo
+#define ENCODER_LEFT_B_PIN 2         // Pin B del encoder izquierdo (INT0)
+#define ENCODER_RIGHT_A_PIN 9        // Pin A del encoder derecho
+#define ENCODER_RIGHT_B_PIN 3        // Pin B del encoder derecho (INT1)
 
 class Encoder {
 private:
     static volatile long leftPulses;     // Contador de pulsos del encoder izquierdo
     static volatile long rightPulses;    // Contador de pulsos del encoder derecho
+    // Pulsos por revolución (ajustable en runtime)
+    static int pulsesPerRevolution;
     
 public:
     // Inicialización del encoder
@@ -46,8 +63,9 @@ public:
     static void leftEncoderISR();
     static void rightEncoderISR();
     
-    // Getters para configuración
-    static int getPulsesPerRevolution() { return PULSES_PER_REVOLUTION; }
+    // Getters/Setters para configuración (runtime ajustable)
+    static int getPulsesPerRevolution();
+    static void setPulsesPerRevolution(int v);
     static float getWheelDiameter() { return WHEEL_DIAMETER_CM; }
 };
 

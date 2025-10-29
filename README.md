@@ -20,6 +20,29 @@ Sistema completo de control para robot móvil autónomo basado en Arduino Uno co
 - **Precisión de giro**: ±8° de tolerancia
 
 ## 🔌 Conexiones de Hardware
+````markdown
+# 🤖 AMR (Autonomous Mobile Robot) - Sistema de Control Completo
+
+## 📋 Descripción del Proyecto
+
+Sistema completo de control para robot móvil autónomo basado en Arduino Uno con control de motores, odometría y navegación por teclado. El robot incluye encoders rotativos, drivers de motor BTS7960 y capacidades de tracking de posición en tiempo real.
+
+## 🛠️ Hardware Requerido
+
+### Componentes Principales:
+- **Arduino Uno** - Microcontrolador principal
+- **Encoder E386G5** - 400 PPR × 3 = 1200 PPR total
+- **Driver BTS7960** (x2) - Control de motores DC (hasta 43A)
+- **Motores DC** (x2) - Con ruedas de 16cm de diámetro
+- **Fuente de alimentación** - Para motores (12V/24V recomendado)
+
+### Especificaciones:
+- **Resolución de encoder**: 1200 pulsos por revolución
+- **Diámetro de rueda**: 16cm
+- **Velocidad máxima**: Variable (0-255 PWM)
+- **Precisión de giro**: ±8° de tolerancia
+
+## 🔌 Conexiones de Hardware
 
 ### Encoders:
 ```
@@ -49,6 +72,52 @@ Enables (REN/LEN): Alimentación externa (siempre HIGH)
 - **Arduino**: 5V USB o 7-12V jack
 - **Motores**: Fuente externa 12V/24V conectada a BTS7960
 - **Enables**: Conectar VCC de Arduino a REN/LEN de ambos BTS7960
+
+### Sensores Infrarrojos (IR) - Analógicos
+
+Este proyecto soporta un arreglo de 5 sensores IR analógicos conectados a los
+pines A0..A5 del Arduino (configuración usada en el sketch `AMR_Complete.ino`).
+Se asumió que los sensores funcionan a 5V y devuelven un valor analógico en el
+rango 0..1023 donde valores mayores representan detección.
+
+Conexión recomendada:
+- VCC del sensor -> 5V del Arduino
+- GND del sensor -> GND común
+- OUT del sensor -> pin analógico del Arduino
+
+Mapeo por defecto en el firmware:
+- LEFT_SIDE (lateral izquierdo)  -> `A0`
+- FRONT_LEFT (frontal izquierdo) -> `A1`
+- BACK_CENTER (trasero central)  -> `A2`
+- FRONT_RIGHT (frontal derecho)  -> `A4`
+- RIGHT_SIDE (lateral derecho)   -> `A5`
+
+Parámetros y notas:
+- Umbral por defecto: `IR_THRESHOLD = 600` (0..1023). Ajustar tras calibración.
+- Lectura: el sketch toma 3 muestras y promedia para reducir ruido (configurable).
+- En el comando de inspección `I` el sketch imprime tanto el valor bruto como el
+	estado detectado (0/1) por cada sensor. Ejemplo de salida:
+
+```
+IR: L:0(123) FL:1(712) B:0(200) FR:0(189) R:0(145)
+```
+
+Calibración rápida desde Serial Monitor:
+1. Abrir Serial Monitor a 115200 baudios.
+2. Con el sensor apuntando a un área libre de obstáculos, enviar `I` y anotar los
+	 valores "raw" (mínimos).
+3. Colocar un objeto delante del sensor y enviar `I` para obtener los valores
+	 máximos detectados.
+4. Elegir un umbral intermedio entre mínimo y máximo (por ejemplo (min+max)/2)
+	 y actualizar `IR_THRESHOLD` en el código o realizar una calibración automática
+	 si se implementa posteriormente.
+
+Acciones sugeridas en el robot:
+- Evitar avanzar (comando `W`) si cualquiera de los sensores frontales detecta
+	un obstáculo (lógica a añadir en el sketch opcionalmente).
+- Enviar telemetría periódica de IR por `Serial1` si se usa Arduino R4 con WiFi
+	para exponer datos al dashboard (pendiente de implementación).
+
 
 ## 🎮 Controles del Sistema
 
@@ -108,7 +177,6 @@ AMR/
 │   ├── MotorDriver.h/.cpp        # Control de motores BTS7960  
 │   ├── Encoder.h/.cpp            # Manejo de encoders E386G5
 │   └── Odometry.h/.cpp           # Sistema de odometría
-├── raspberry/                    # Lógica Python (futuro)
 ├── docs/                         # Documentación técnica
 └── README.md                     # Esta documentación
 ```
@@ -188,8 +256,7 @@ AMR/
 
 ## 🔮 Desarrollo Futuro
 
-### Próximas características:
-- [ ] Integración con Raspberry Pi
+-### Próximas características:
 - [ ] Control remoto WiFi/Bluetooth
 - [ ] Navegación autónoma con sensores
 - [ ] Mapeo y localización (SLAM)

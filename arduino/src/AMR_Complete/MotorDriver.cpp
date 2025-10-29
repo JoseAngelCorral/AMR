@@ -55,13 +55,20 @@ void MotorDriver::turnLeft(int speed) {
     speed = constrain(speed, MIN_SPEED, MAX_SPEED);
     currentSpeed = speed;
     
+    Serial.print(F("TurnL: speed="));
+    Serial.println(speed);
+    
     // Motor izquierdo hacia atrás (giro en su lugar - corregido)
     analogWrite(MOTOR_LEFT_RPWM, speed);   // PWM adelante
     analogWrite(MOTOR_LEFT_LPWM, 0);       // PWM atrás = 0
+    Serial.print(F("IzqR="));
+    Serial.println(speed);
     
     // Motor derecho hacia adelante (corregido)
     analogWrite(MOTOR_RIGHT_RPWM, 0);      // PWM adelante = 0
     analogWrite(MOTOR_RIGHT_LPWM, speed);  // PWM atrás
+    Serial.print(F("DerL="));
+    Serial.println(speed);
 }
 
 void MotorDriver::turnRight(int speed) {
@@ -69,13 +76,20 @@ void MotorDriver::turnRight(int speed) {
     speed = constrain(speed, MIN_SPEED, MAX_SPEED);
     currentSpeed = speed;
     
+    Serial.print(F("TurnR: speed="));
+    Serial.println(speed);
+    
     // Motor izquierdo hacia adelante (corregido)
     analogWrite(MOTOR_LEFT_RPWM, 0);       // PWM adelante = 0
     analogWrite(MOTOR_LEFT_LPWM, speed);   // PWM atrás
+    Serial.print(F("IzqL="));
+    Serial.println(speed);
     
     // Motor derecho hacia atrás (corregido)
     analogWrite(MOTOR_RIGHT_RPWM, speed);  // PWM adelante
     analogWrite(MOTOR_RIGHT_LPWM, 0);      // PWM atrás = 0
+    Serial.print(F("DerR="));
+    Serial.println(speed);
 }
 
 void MotorDriver::stop() {

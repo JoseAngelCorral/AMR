@@ -7,7 +7,8 @@
 #include "Encoder.h"
 
 // Configuración del robot
-#define WHEEL_BASE_CM 20.0   // Distancia entre ruedas en cm (ajustar según tu robot)
+// IMPORTANTE: actualizar a la distancia centro-a-centro real entre ruedas
+#define WHEEL_BASE_CM 63.5   // Distancia entre ruedas en cm (centro a centro)
 
 class Odometry {
 private:
