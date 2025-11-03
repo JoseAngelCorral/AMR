@@ -199,18 +199,18 @@ void MotorDriver::testRightMotor() {
     
     // Test Pin 6 (LPWM) - Adelante (corregido)
     Serial.println(F("Pin6+ (Adelante)"));
-    analogWrite(5, 0);      
-    analogWrite(6, 200);   
+    analogWrite(MOTOR_RIGHT_RPWM, 0);
+    analogWrite(MOTOR_RIGHT_LPWM, 200);
     delay(2000);
     analogWrite(6, 0);     
     delay(500);
     
     // Test Pin 5 (RPWM) - Atrás (corregido)
     Serial.println(F("Pin5- (Atras)"));
-    analogWrite(5, 200);   
-    analogWrite(6, 0);     
+    analogWrite(MOTOR_RIGHT_RPWM, 200);
+    analogWrite(MOTOR_RIGHT_LPWM, 0);
     delay(2000);
-    analogWrite(5, 0);     
+    analogWrite(MOTOR_RIGHT_RPWM, 0);
     delay(500);
     
     Serial.println(F("Revisar conexiones si no gira"));

@@ -17,12 +17,17 @@ void Encoder::init() {
     // Usar digitalPinToInterrupt para enlazar ISRs a los pines B configurados.
     int intLeft = digitalPinToInterrupt(ENCODER_LEFT_B_PIN);
     int intRight = digitalPinToInterrupt(ENCODER_RIGHT_B_PIN);
-    if (intLeft == NOT_AN_INTERRUPT || intRight == NOT_AN_INTERRUPT) {
-        Serial.print(F("Warning: encoder B pin not an interrupt: L_B=")); Serial.print(ENCODER_LEFT_B_PIN);
+    // digitalPinToInterrupt may return a negative value on cores that don't support
+    // interrupts on those pins. Instead of relying on NOT_AN_INTERRUPT macro (which
+    // may not be defined on all cores), check for a negative value and only attach
+    // the interrupt if valid.
+    if (intLeft < 0 || intRight < 0) {
+        Serial.print(F("Warning: encoder B pin(s) not an interrupt: L_B=")); Serial.print(ENCODER_LEFT_B_PIN);
         Serial.print(F(" R_B=")); Serial.println(ENCODER_RIGHT_B_PIN);
+    } else {
+        attachInterrupt(intLeft, leftEncoderISR, CHANGE);
+        attachInterrupt(intRight, rightEncoderISR, CHANGE);
     }
-    attachInterrupt(intLeft, leftEncoderISR, CHANGE);
-    attachInterrupt(intRight, rightEncoderISR, CHANGE);
     
     // Reset contadores
     resetBoth();

@@ -9,7 +9,7 @@
 // Observación: durante la inspección los contadores mostraron ~3389-3446 pulsos
 // por vuelta. Para reflejar el valor real medido ajustamos PULSES_PER_REVOLUTION
 // a ese valor promedio. Si calibras de nuevo, actualiza este número.
-#define DEFAULT_PULSES_PER_REVOLUTION 2950  // Valor por defecto (ajústalo si calibras)
+#define DEFAULT_PULSES_PER_REVOLUTION 3100  // Valor por defecto (ajústalo si calibras)
 #define WHEEL_DIAMETER_CM 15.50       // Diámetro de la rueda en centímetros
 #define WHEEL_CIRCUMFERENCE_CM (PI * WHEEL_DIAMETER_CM)  // Circunferencia en cm
 
