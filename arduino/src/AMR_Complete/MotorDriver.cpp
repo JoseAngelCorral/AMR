@@ -51,20 +51,31 @@ void MotorDriver::moveBackward(int speed) {
 }
 
 void MotorDriver::turnLeft(int speed) {
-    // Limitar velocidad
-    speed = constrain(speed, MIN_SPEED, MAX_SPEED);
+    // Allow manual turn speeds below MIN_SPEED: constrain to 0..MAX_SPEED
+    // This enables low-speed manual turning (e.g. 20% PWM) even if MIN_SPEED
+    // (used for overcoming static friction in linear motion) is higher.
+    speed = constrain(speed, 0, MAX_SPEED);
     currentSpeed = speed;
-    
+
     Serial.print(F("TurnL: speed="));
     Serial.println(speed);
-    
-    // Motor izquierdo hacia atrás (giro en su lugar - corregido)
+
+    if (speed == 0) {
+        // stop motors if zero requested
+        analogWrite(MOTOR_LEFT_RPWM, 0);
+        analogWrite(MOTOR_LEFT_LPWM, 0);
+        analogWrite(MOTOR_RIGHT_RPWM, 0);
+        analogWrite(MOTOR_RIGHT_LPWM, 0);
+        return;
+    }
+
+    // Motor izquierdo hacia atrás (giro en su lugar)
     analogWrite(MOTOR_LEFT_RPWM, speed);   // PWM adelante
     analogWrite(MOTOR_LEFT_LPWM, 0);       // PWM atrás = 0
     Serial.print(F("IzqR="));
     Serial.println(speed);
-    
-    // Motor derecho hacia adelante (corregido)
+
+    // Motor derecho hacia adelante
     analogWrite(MOTOR_RIGHT_RPWM, 0);      // PWM adelante = 0
     analogWrite(MOTOR_RIGHT_LPWM, speed);  // PWM atrás
     Serial.print(F("DerL="));
@@ -72,20 +83,28 @@ void MotorDriver::turnLeft(int speed) {
 }
 
 void MotorDriver::turnRight(int speed) {
-    // Limitar velocidad
-    speed = constrain(speed, MIN_SPEED, MAX_SPEED);
+    // Allow manual turn speeds below MIN_SPEED: constrain to 0..MAX_SPEED
+    speed = constrain(speed, 0, MAX_SPEED);
     currentSpeed = speed;
-    
+
     Serial.print(F("TurnR: speed="));
     Serial.println(speed);
-    
-    // Motor izquierdo hacia adelante (corregido)
+
+    if (speed == 0) {
+        analogWrite(MOTOR_LEFT_RPWM, 0);
+        analogWrite(MOTOR_LEFT_LPWM, 0);
+        analogWrite(MOTOR_RIGHT_RPWM, 0);
+        analogWrite(MOTOR_RIGHT_LPWM, 0);
+        return;
+    }
+
+    // Motor izquierdo hacia adelante
     analogWrite(MOTOR_LEFT_RPWM, 0);       // PWM adelante = 0
     analogWrite(MOTOR_LEFT_LPWM, speed);   // PWM atrás
     Serial.print(F("IzqL="));
     Serial.println(speed);
-    
-    // Motor derecho hacia atrás (corregido)
+
+    // Motor derecho hacia atrás
     analogWrite(MOTOR_RIGHT_RPWM, speed);  // PWM adelante
     analogWrite(MOTOR_RIGHT_LPWM, 0);      // PWM atrás = 0
     Serial.print(F("DerR="));

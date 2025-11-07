@@ -364,9 +364,9 @@ const char dashboardHTML[] PROGMEM = R"rawliteral(
     <div class="control-section">
         <div class="controls" style="width:100%;max-width:320px;text-align:center;">
             <button id="btnW" onmousedown="startHold('W')" onmouseup="stopHold()" onmouseleave="stopHold()" ontouchstart="startHold('W')" ontouchend="stopHold()">↑ Adelante</button><br>
-            <button onclick="sendCmd('A')">← Izq</button>
+            <button onmousedown="startHold('Q')" onmouseup="stopHold()" onmouseleave="stopHold()" ontouchstart="startHold('Q')" ontouchend="stopHold()">← Izq</button>
             <button onclick="sendCmd('X')">⏹ Stop</button>
-            <button onclick="sendCmd('D')">Der →</button><br>
+            <button onmousedown="startHold('E')" onmouseup="stopHold()" onmouseleave="stopHold()" ontouchstart="startHold('E')" ontouchend="stopHold()">Der →</button><br>
             <button id="btnS" onmousedown="startHold('S')" onmouseup="stopHold()" onmouseleave="stopHold()" ontouchstart="startHold('S')" ontouchend="stopHold()">↓ Atrás</button>
         </div>
 
@@ -1016,15 +1016,21 @@ void processCommand(char cmd) {
             break;
             
         case 'Q':
-            // Giro continuo a la izquierda hasta recibir 'X'
-            Serial.println(F("Giro Izq continuo (hasta X)"));
-            motors.turnLeft();
+            // Giro continuo a la izquierda (manual, while-pressed). Use 20% PWM
+            {
+                int manualTurnSpeed = (int)(MAX_SPEED * 0.20f);
+                Serial.print(F("Giro Izq manual (hold). speed=")); Serial.println(manualTurnSpeed);
+                motors.turnLeft(manualTurnSpeed);
+            }
             break;
                         
         case 'E':
-            // Giro continuo a la derecha hasta recibir 'X'
-            Serial.println(F("Giro Der continuo (hasta X)"));
-            motors.turnRight();
+            // Giro continuo a la derecha (manual, while-pressed). Use 20% PWM
+            {
+                int manualTurnSpeed = (int)(MAX_SPEED * 0.20f);
+                Serial.print(F("Giro Der manual (hold). speed=")); Serial.println(manualTurnSpeed);
+                motors.turnRight(manualTurnSpeed);
+            }
             break;
 
     // ---------------------------
