@@ -26,6 +26,29 @@
 class MotorDriver {
 private:
     byte currentSpeed;
+    // --- PID velocity control members ---
+    bool velocityControlEnabled = false;
+    unsigned long lastPIDMillis = 0;
+    unsigned int pidIntervalMs = 50; // PID update interval (ms)
+
+    // Targets and applied setpoints (pulses per second)
+    float targetLeftPps = 0.0f;
+    float targetRightPps = 0.0f;
+    float appliedLeftPps = 0.0f;
+    float appliedRightPps = 0.0f;
+
+    // PID state
+    float Kp = 0.08f; // initial guess, tune on hardware
+    float Ki = 0.02f;
+    float Kd = 0.002f;
+    float leftIntegral = 0.0f;
+    float rightIntegral = 0.0f;
+    float leftPrevError = 0.0f;
+    float rightPrevError = 0.0f;
+    float integralClamp = 500.0f; // anti-windup
+
+    // Soft-start ramp time in ms (time to go from 0 -> target)
+    unsigned long rampTimeMs = 800;
     
 public:
     void init();
@@ -48,6 +71,26 @@ public:
     // Funciones de diagnóstico
     void testMotors();              // Test automático de motores
     void testRightMotor();          // Diagnóstico específico motor derecho
+    
+    // --- Velocity PID API ---
+    // Enable/disable closed-loop velocity control
+    void enableVelocityControl(bool en);
+    bool isVelocityControlEnabled();
+
+    // Set PID gains (tune on hardware)
+    void setPIDGains(float kp, float ki, float kd);
+
+    // Set PID update interval
+    void setPIDInterval(unsigned int ms);
+
+    // Set ramp time (ms) for soft-start
+    void setRampTime(unsigned long ms);
+
+    // Set target speed in pulses per second (encoder pulses/sec)
+    void setTargetPulsesPerSecond(float leftPps, float rightPps);
+
+    // Must be called periodically (from main loop) with encoder deltas and dt
+    void updateVelocityControl(long leftDeltaPulses, long rightDeltaPulses, unsigned long dtMs);
     
     // Getters
     int getCurrentSpeed() { return currentSpeed; }
