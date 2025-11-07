@@ -335,12 +335,13 @@ const char dashboardHTML[] PROGMEM = R"rawliteral(
     /* separation and header for controls section */
     .section-title { color:#7CFC00; text-align:center; margin:12px 0 6px; font-size:1.02rem; }
     .control-section { display:flex; justify-content:center; gap:18px; align-items:flex-start; margin-top:10px; padding:8px 6px; border-top:1px solid #222; flex-wrap:wrap; }
-    /* D-pad (cruceta) layout */
-    .dpad { display:grid; grid-template-columns: 56px 56px 56px; grid-template-rows: 56px 56px 56px; gap:8px; justify-content:center; align-items:center; }
-    .dpad-btn { width:56px; height:56px; border-radius:8px; background:#333; color:#0f0; border:none; font-size:18px; display:flex; align-items:center; justify-content:center; }
+    /* D-pad (cruceta) layout: use previous button aesthetic but arranged in cruceta */
+    .dpad { display:grid; grid-template-columns: 1fr 1fr 1fr; grid-auto-rows: auto; gap:10px; justify-content:center; align-items:center; width:100%; max-width:360px; margin:0 auto; }
+    .dpad-btn { background:#333; color:#0f0; border:none; border-radius:8px; padding:10px 16px; font-size:16px; min-width:110px; min-height:44px; cursor:pointer; }
+    .dpad-btn:hover { background:#7CFC00; color:#000; }
     .dpad-btn:active { transform: translateY(1px); }
     .dpad .spacer { background:transparent; box-shadow:none; border:none; }
-    .dpad .stop { width:64px; height:64px; font-size:20px; border-radius:10px; background:#444; }
+    .dpad .stop { background:#444; color:#fff; font-weight:bold; }
     .route-btn { background:#222; color:#7CFC00; border:1px solid #333; padding:10px 14px; border-radius:8px; font-size:16px; cursor:pointer; }
     .test-btn { background:#222; color:#7CFC00; border:1px solid #333; padding:8px 10px; border-radius:6px; font-size:14px; cursor:pointer; min-width:110px; }
     .test-btn:hover { background:#7CFC00; color:#000; border-color:#7CFC00; }
@@ -372,15 +373,15 @@ const char dashboardHTML[] PROGMEM = R"rawliteral(
         <div>
             <div class="dpad">
                 <button class="dpad-btn spacer" aria-hidden="true"></button>
-                <button id="btnW" class="dpad-btn up" onmousedown="startHold('W')" onmouseup="stopHold()" onmouseleave="stopHold()" ontouchstart="startHold('W')" ontouchend="stopHold()">↑</button>
+                <button id="btnW" class="dpad-btn up" onmousedown="startHold('W')" onmouseup="stopHold()" onmouseleave="stopHold()" ontouchstart="startHold('W')" ontouchend="stopHold()">↑ Adelante</button>
                 <button class="dpad-btn spacer" aria-hidden="true"></button>
 
-                <button class="dpad-btn left" onmousedown="startHold('Q')" onmouseup="stopHold()" onmouseleave="stopHold()" ontouchstart="startHold('Q')" ontouchend="stopHold()">←</button>
-                <button class="dpad-btn stop" onclick="sendCmd('X')">⏹</button>
-                <button class="dpad-btn right" onmousedown="startHold('E')" onmouseup="stopHold()" onmouseleave="stopHold()" ontouchstart="startHold('E')" ontouchend="stopHold()">→</button>
+                <button class="dpad-btn left" onmousedown="startHold('Q')" onmouseup="stopHold()" onmouseleave="stopHold()" ontouchstart="startHold('Q')" ontouchend="stopHold()">← Izq</button>
+                <button class="dpad-btn stop" onclick="sendCmd('X')">⏹ Stop</button>
+                <button class="dpad-btn right" onmousedown="startHold('E')" onmouseup="stopHold()" onmouseleave="stopHold()" ontouchstart="startHold('E')" ontouchend="stopHold()">Der →</button>
 
                 <button class="dpad-btn spacer" aria-hidden="true"></button>
-                <button id="btnS" class="dpad-btn down" onmousedown="startHold('S')" onmouseup="stopHold()" onmouseleave="stopHold()" ontouchstart="startHold('S')" ontouchend="stopHold()">↓</button>
+                <button id="btnS" class="dpad-btn down" onmousedown="startHold('S')" onmouseup="stopHold()" onmouseleave="stopHold()" ontouchstart="startHold('S')" ontouchend="stopHold()">↓ Atrás</button>
                 <button class="dpad-btn spacer" aria-hidden="true"></button>
             </div>
         </div>
