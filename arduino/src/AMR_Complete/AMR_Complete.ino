@@ -48,40 +48,321 @@ const char* AP_PASS = "12345678"; // puedes cambiarla
 
 WiFiServer server(80);
 
-// ======== DASHBOARD HTML (Chart.js + Canvas) ========
+// Forward declare types/functions that are referenced in generated prototypes
+struct IRSensors;
+void startAutoTurn(float angleDelta);
+
+// ----------------------
+// Routes data (for dropdown UI)
+// ----------------------
+struct Point { float x; float y; };
+
+// Example routes (adjust/add as needed)
+const Point route0[] = { {0.0f,0.0f}, {30.0f,0.0f}, {30.0f,30.0f} };
+const Point route1[] = { {-10.0f,5.0f}, {0.0f,10.0f}, {10.0f,5.0f}, {0.0f,0.0f} };
+const Point route2[] = { {-10.0f,5.0f}, {0.0f,10.0f}, {10.0f,5.0f}, {0.0f,0.0f} };
+
+const char* routeNames[] = { "Ruta A", "Ruta B","Ruta C" };
+const Point* routesPoints[] = { route0, route1, route2 };
+const int routesCounts[] = { sizeof(route0)/sizeof(route0[0]), sizeof(route1)/sizeof(route1[0]), sizeof(route2)/sizeof(route1[0]) };
+const int ROUTE_COUNT = 3;
+
+
+// ----------------------
+// Routes UI page (serves the dropdown HTML)
+// Access it at: http://<robot_ip>/routes_ui
+const char routesPageHTML[] PROGMEM = R"rawliteral(
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Control de Rutas - Robot</title>
+    <style>
+        /* Dashboard-like dark theme for Routes UI */
+        html, body {
+            background: #0b0b0b;
+            color: #eaeaea;
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 12px;
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+            -webkit-touch-callout: none;
+            -webkit-tap-highlight-color: rgba(0,0,0,0);
+            touch-action: manipulation;
+        }
+        .container { max-width: 780px; margin: 0 auto; }
+    .card { background: #111; border: 1px solid #222; border-radius: 8px; padding: 12px; box-shadow: 0 2px 6px rgba(0,0,0,0.6); display:block; }
+        .headerRow { display:flex; align-items:center; gap:10px; margin-bottom:10px; }
+        .headerRow h2 { margin:0; font-size:1.2em; color:#7CFC00; }
+        .headerRow button { background:transparent; border:0; color:#7CFC00; font-size:20px; width:40px; height:40px; border-radius:6px; cursor:pointer; }
+        .headerRow button:active { transform: translateY(1px); }
+
+    label { display:block; margin: 8px 0 6px 0; color:#ccc; text-align:center; }
+    select, input[type=number] { width:90%; max-width:540px; padding:8px; border-radius:6px; border:1px solid #333; background:#0d0d0d; color:#eee; margin:0 auto; }
+        select option { background:#111; color:#eee; }
+        pre { background:#0e0e0e; color:#cfcfcf; padding:8px; border-radius:6px; }
+
+    .row { display:flex; gap:18px; align-items:flex-start; width:100%; }
+        .row > * { flex: 1 1 auto; }
+    .controls { display:flex; gap:8px; margin-top:8px; flex-wrap:wrap; justify-content:center; }
+    .controls button { background:#222; color:#7CFC00; border:none; padding:10px 12px; margin:4px 0; font-size:16px; border-radius:6px; cursor:pointer; }
+        .controls button:hover { background:#7CFC00; color:#000; }
+
+        @media (max-width:520px) {
+            .container { padding:6px; }
+            .headerRow h2 { font-size:1.0em; }
+            .controls button { padding:12px 14px; font-size:18px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+    <div class="card">
+    <div class="headerRow">
+        <button id="backToDash" title="Volver al dashboard" onclick="location.href='/'">←</button>
+        <h2>Seleccionar ruta y waypoint</h2>
+    </div>
+    
+    <div>
+        <label for="routeSelect">Selecciona la ruta:</label>
+        <select id="routeSelect"></select>
+    </div>
+
+    <div>
+        <label for="waypointSelect">Waypoints de la ruta (x,y,route):</label>
+        <select id="waypointSelect"></select>
+    </div>
+
+    <div>
+        <label for="allPointsSelect">Todos los puntos (x,y,route,point):</label>
+        <select id="allPointsSelect" size="6"></select>
+    </div>
+
+    <div class="row">
+        <div>
+            <label for="delaySec">Delay antes de iniciar (segundos):</label>
+            <input id="delaySec" type="number" value="10" min="0" style="width:100%" />
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px;">
+            <div class="controls">
+                <button id="startIda">Iniciar (IDA)</button>
+                <button id="startRet">Iniciar (RETORNO)</button>
+                <button id="stopRoute">Detener</button>
+            </div>
+            <div class="controls">
+                <button id="confirmStart" disabled>Confirmar inicio</button>
+                <div style="padding:6px; background:#222; color:#0f0; border-radius:4px; text-align:center;">Cuenta regresiva: <span id="countdown">--</span></div>
+            </div>
+            
+        </div>
+    </div>
+
+    </div> <!-- .card -->
+    </div> <!-- .container -->
+
+    <div>
+        <strong>Estado:</strong>
+        <pre id="status">Inactivo</pre>
+    </div>
+
+    <div>
+        <strong>Coordenada seleccionada:</strong>
+        <pre id="selected">Ninguna</pre>
+    </div>
+
+    <script>
+        const ROUTES_URL = '/routes';
+        const START_URL = '/start_route';
+        const STOP_URL = '/stop_route';
+        const STATUS_URL = '/route_status';
+        const CONFIRM_URL = '/confirm_route';
+
+        let routes = [];
+        const routeSelect = document.getElementById('routeSelect');
+        const waypointSelect = document.getElementById('waypointSelect');
+        const allPointsSelect = document.getElementById('allPointsSelect');
+        const selectedPre = document.getElementById('selected');
+        const statusPre = document.getElementById('status');
+        const countdownSpan = document.getElementById('countdown');
+        const confirmBtn = document.getElementById('confirmStart');
+
+        async function loadRoutes() {
+            try {
+                const resp = await fetch(ROUTES_URL, { cache: 'no-store' });
+                if (!resp.ok) throw new Error('Error ' + resp.status);
+                routes = await resp.json();
+                populateRouteSelect();
+                populateAllPoints();
+                if (routes.length > 0) { routeSelect.selectedIndex = 0; populateWaypointsForRoute(0); }
+            } catch (err) {
+                statusPre.textContent = 'No se pudieron cargar rutas: ' + err;
+            }
+        }
+
+        function populateRouteSelect() {
+            routeSelect.innerHTML = '';
+            routes.forEach((r, idx) => { const opt=document.createElement('option'); opt.value=idx; opt.textContent = `Ruta: ${r.name||('#'+idx)}`; routeSelect.appendChild(opt); });
+        }
+        function populateWaypointsForRoute(routeIndex) {
+            waypointSelect.innerHTML = '';
+            const waypoints = (routes[routeIndex] && routes[routeIndex].points) || [];
+            waypoints.forEach((pt,pIndex)=>{ const opt=document.createElement('option'); opt.value=`${routeIndex}|${pIndex}`; opt.textContent=`(${pt.x}, ${pt.y}, ${routeIndex})`; waypointSelect.appendChild(opt); });
+            if (waypoints.length===0){ const opt=document.createElement('option'); opt.textContent='(sin waypoints)'; opt.value=''; waypointSelect.appendChild(opt);} 
+        }
+        function populateAllPoints(){ allPointsSelect.innerHTML=''; routes.forEach((r,ri)=>{ (r.points||[]).forEach((pt,pi)=>{ const opt=document.createElement('option'); opt.value=`${ri}|${pi}`; opt.textContent=`(${pt.x}, ${pt.y}, ${ri}, ${pi}) — ${r.name||''}`; allPointsSelect.appendChild(opt); }); }); }
+        function showSelectedFromOptionValue(value){ if(!value){ selectedPre.textContent='Ninguna'; return; } const [r,p]=value.split('|').map(n=>parseInt(n,10)); if(isNaN(r)||isNaN(p)||!routes[r]||!routes[r].points[p]){ selectedPre.textContent='Valor inválido'; return; } const pt=routes[r].points[p]; selectedPre.textContent=`Ruta: ${routes[r].name}\nPunto: ${p}\nCoordenadas: x=${pt.x}, y=${pt.y}`; }
+
+        routeSelect.addEventListener('change', ()=>{ const idx=parseInt(routeSelect.value,10); populateWaypointsForRoute(idx); if(waypointSelect.options.length>0){ waypointSelect.selectedIndex=0; showSelectedFromOptionValue(waypointSelect.value);} });
+        waypointSelect.addEventListener('change', ()=> showSelectedFromOptionValue(waypointSelect.value));
+        allPointsSelect.addEventListener('change', ()=>{ showSelectedFromOptionValue(allPointsSelect.value); const [r,p]=allPointsSelect.value.split('|').map(n=>parseInt(n,10)); if(!isNaN(r)){ routeSelect.value = r; populateWaypointsForRoute(r); if(!isNaN(p) && waypointSelect.options[p]) waypointSelect.selectedIndex = p; } });
+
+        async function startRoute(dir) {
+            const ridx = parseInt(routeSelect.value || '0', 10);
+            const delaySec = parseFloat(document.getElementById('delaySec').value || '0');
+            const delayMs = Math.max(0, Math.round(delaySec*1000));
+            const url = `${START_URL}?route=${ridx}&dir=${dir}&delay=${delayMs}`;
+            try {
+                statusPre.textContent = 'Programando route...';
+                const r = await fetch(url);
+                if (!r.ok) throw new Error('HTTP '+r.status);
+                statusPre.textContent = 'Route programada';
+                // start polling status
+            } catch (e) { statusPre.textContent = 'Error: '+e; }
+        }
+
+        async function stopRoute(){ try { const r = await fetch(STOP_URL); if(!r.ok) throw new Error('HTTP '+r.status); statusPre.textContent = 'Detenido'; } catch(e){ statusPre.textContent = 'Error stop: '+e; } }
+
+        async function confirmStart(){ try { const r = await fetch(CONFIRM_URL); if(!r.ok) throw new Error('HTTP '+r.status); statusPre.textContent = 'Inicio confirmado'; } catch(e){ statusPre.textContent = 'Error confirm: '+e; } }
+
+        document.getElementById('startIda').addEventListener('click', ()=> startRoute('ida'));
+        document.getElementById('startRet').addEventListener('click', ()=> startRoute('retorno'));
+        document.getElementById('stopRoute').addEventListener('click', ()=> stopRoute());
+        confirmBtn.addEventListener('click', ()=> confirmStart());
+
+        // Poll route status and update UI
+        async function pollStatus(){
+            try {
+                const r = await fetch(STATUS_URL, { cache: 'no-store' });
+                if (!r.ok) throw new Error('Status HTTP '+r.status);
+                const j = await r.json();
+                // update state
+                if (j.active) {
+                    statusPre.textContent = `Active. state:${j.state} route:${j.routeIndex} pt:${j.currentPoint} awaitingConfirm:${j.awaitingConfirm}`;
+                    // disable start buttons while active
+                    document.getElementById('startIda').disabled = true;
+                    document.getElementById('startRet').disabled = true;
+                    document.getElementById('stopRoute').disabled = false;
+                } else {
+                    statusPre.textContent = 'Inactivo';
+                    document.getElementById('startIda').disabled = false;
+                    document.getElementById('startRet').disabled = false;
+                    document.getElementById('stopRoute').disabled = true;
+                }
+                // awaiting confirm
+                if (j.awaitingConfirm) {
+                    confirmBtn.disabled = false;
+                } else {
+                    confirmBtn.disabled = true;
+                }
+                // countdown
+                if (j.remainingDelayMs && j.remainingDelayMs > 0) {
+                    const s = Math.ceil(j.remainingDelayMs/1000);
+                    countdownSpan.textContent = s + ' s';
+                } else {
+                    countdownSpan.textContent = '--';
+                }
+            } catch (e) {
+                // ignore
+            }
+        }
+
+        // initial load and start polling
+        loadRoutes();
+        setInterval(pollStatus, 800);
+    </script>
+    <script>
+        // Evitar que se seleccione texto en el UI por long-press
+        document.addEventListener('selectstart', function(e) {
+            const t = e.target && e.target.tagName;
+            if (t !== 'INPUT' && t !== 'TEXTAREA' && t !== 'SELECT') e.preventDefault();
+        }, false);
+        // Prevenir el menu contextual por long-press en botones (solo en botones)
+        document.addEventListener('contextmenu', function(e){ if (e.target && e.target.tagName === 'BUTTON') e.preventDefault(); }, false);
+    </script>
+</body>
+</html>
+)rawliteral";
+
+// Full dashboard page: user-provided layout completed with responsive CSS and JS
 const char dashboardHTML[] PROGMEM = R"rawliteral(
 <!DOCTYPE html>
 <html>
 <head>
 <meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
 <title>AMR Dashboard</title>
 <style>
-    body { background:#111; color:#eee; font-family:Arial; text-align:center; margin:0; padding:0;}
-    h1 { color:#0f0; }
-    #charts { display:flex; justify-content:space-around; flex-wrap:wrap; margin-top:10px; }
-    canvas { background:#222; border:1px solid #444; border-radius:6px; }
-    button { background:#333; color:#0f0; border:none; padding:10px 16px; margin:4px; font-size:18px; border-radius:4px;}
-    button:hover { background:#0f0; color:#000; }
+    /* Evitar selección y resaltado táctil en botones/áreas no editables */
+    html, body {
+        background:#111; color:#eee; font-family:Arial; margin:0; padding:8px;
+        -webkit-user-select: none; /* Safari */
+        -moz-user-select: none;
+        -ms-user-select: none;
+        user-select: none; /* Evita selección de texto por long-press */
+        -webkit-touch-callout: none; /* iOS long-press */
+        -webkit-tap-highlight-color: rgba(0,0,0,0); /* quitar highlight */
+        touch-action: manipulation; /* mejora la interacción táctil */
+    }
+    /* Permitir selección en campos editables */
+    select, input, textarea { -webkit-user-select: text; user-select: text; }
+    h1 { color:#0f0; text-align:center; margin:8px 0; }
+    #charts { display:flex; justify-content:space-around; flex-wrap:wrap; gap:10px; align-items:center; padding:6px; }
+    /* Ensure chart panels center their content and have matching center lines */
+    .chart { display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:160px; }
+    canvas { background:#222; border:1px solid #444; border-radius:6px; display:block; width:100%; height:auto; }
+    .map { max-width:260px; }
+    .compass { max-width:140px; }
+    .ir { max-width:300px; }
+    .controls { margin-top:14px; display:flex; justify-content:center; gap:8px; flex-wrap:wrap; }
+    .controls button { background:#333; color:#0f0; border:none; padding:10px 16px; margin:4px; font-size:18px; border-radius:6px; }
+    .controls button:hover { background:#0f0; color:#000; }
+    /* Tests panel (compact buttons to trigger built-in tests) */
+    .tests-grid { display:flex; gap:8px; justify-content:center; flex-wrap:wrap; margin-top:10px; }
+    /* separation and header for controls section */
+    .section-title { color:#7CFC00; text-align:center; margin:12px 0 6px; font-size:1.02rem; }
+    .control-section { display:flex; justify-content:center; gap:18px; align-items:flex-start; margin-top:10px; padding:8px 6px; border-top:1px solid #222; flex-wrap:wrap; }
+    .test-btn { background:#222; color:#7CFC00; border:1px solid #333; padding:8px 10px; border-radius:6px; font-size:14px; cursor:pointer; min-width:110px; }
+    .test-btn:hover { background:#7CFC00; color:#000; border-color:#7CFC00; }
+    .status { text-align:center; margin-top:10px; color:#ccc }
+
+    @media (max-width:520px) {
+        .map { max-width:96%; }
+        .compass { max-width:80%; }
+        .ir { max-width:96%; }
+        .controls button { padding:12px 18px; font-size:20px; }
+        /* cruceta buttons use default sizing (no zoom) */
+        .controls > div:first-child button { font-size:18px; padding:10px 16px; }
+    }
 </style>
 </head>
 <body>
-    <h1>🚗 AMR CONTROL DASHBOARD</h1>
+    <h1> AMR CONTROL DASHBOARD</h1>
     <div id="charts">
-        <div>
-            <canvas id="map" width="200" height="200"></canvas><br>
-            <small>Mapa XY</small>
-        </div>
-        <div>
-            <canvas id="compass" width="120" height="120"></canvas><br>
-            <small>Brújula</small>
-        </div>
-        <div>
-            <canvas id="irChart" width="250" height="200"></canvas><br>
-            <small>Sensores IR</small>
-        </div>
+        <div class="chart map"><canvas id="map"></canvas><small>Trayectoria Recorrida</small></div>
+        <div class="chart compass"><canvas id="compass"></canvas><small>Brújula</small></div>
+        <div class="chart ir"><canvas id="irChart"></canvas><small>Sensores IR</small></div>
     </div>
-        <div style="margin-top:20px;">
-            <!-- Botones W/S con comportamiento mantenido (mousedown/touchstart -> enviar repetido) -->
+
+    <!-- Section title separating charts and controls -->
+    <h2 class="section-title">Panel de Control</h2>
+
+    <!-- Controls section: two-column layout for main controls + route button -->
+    <div class="control-section">
+        <div class="controls" style="width:100%;max-width:320px;text-align:center;">
             <button id="btnW" onmousedown="startHold('W')" onmouseup="stopHold()" onmouseleave="stopHold()" ontouchstart="startHold('W')" ontouchend="stopHold()">↑ Adelante</button><br>
             <button onclick="sendCmd('A')">← Izq</button>
             <button onclick="sendCmd('X')">⏹ Stop</button>
@@ -89,126 +370,109 @@ const char dashboardHTML[] PROGMEM = R"rawliteral(
             <button id="btnS" onmousedown="startHold('S')" onmouseup="stopHold()" onmouseleave="stopHold()" ontouchstart="startHold('S')" ontouchend="stopHold()">↓ Atrás</button>
         </div>
 
+        <div style="display:flex;align-items:center;justify-content:center;min-width:140px;">
+            <button onclick="location.href='/routes_ui'">Control Rutas</button>
+        </div>
+    </div>
+
+    <!-- Tests block moved below controls, visually grouped and with a small header -->
+    <div style="text-align:center;margin-top:8px;color:#ccc;font-size:0.95rem;">Pruebas Rápidas</div>
+    <div id="tests" class="tests-grid" style="margin-top:8px;">
+        <button class="test-btn" onclick="sendCmd('T')">Test Motores (T)</button>
+        <button class="test-btn" onclick="sendCmd('V')">Avanzar 1 vuelta (V)</button>
+        <button class="test-btn" onclick="sendCmd('I')">Inspección (I)</button>
+    </div>
+
+    <div class="status"><strong>Estado:</strong> <span id="statusText">-</span></div>
+
     <script>
-// ======= CHART.JS EMBEBIDO =======
-const Chart = (() => {
-const e=(t,s)=>{const n=document.createElement("script");n.src=t;n.onload=s;document.head.appendChild(n)};
-return {load:(cb)=>{const src="https://cdn.jsdelivr.net/npm/chart.js";e(src,cb)}}
-})();
-Chart.load(()=>initCharts());
+    // Responsive canvas setup + lightweight renderer
+    const mapCanvas = document.getElementById('map');
+    const compassCanvas = document.getElementById('compass');
+    const irCanvas = document.getElementById('irChart');
+    const statusText = document.getElementById('statusText');
+    let lastPositions = [];
 
-// ======= VARIABLES GLOBALES =======
-let irChart;
-const mapCanvas=document.getElementById('map');
-const compassCanvas=document.getElementById('compass');
-const ctxMap=mapCanvas.getContext('2d');
-const ctxCompass=compassCanvas.getContext('2d');
-let lastPositions=[];
-
-// ======= FUNCIONES =======
-function initCharts(){
-    const ctx=document.getElementById('irChart').getContext('2d');
-    irChart=new window.Chart(ctx,{
-        type:'bar',
-        data:{
-            labels:['L','FL','B','FR','R'],
-            datasets:[{label:'IR',data:[0,0,0,0,0],
-            backgroundColor:['lime','lime','lime','lime','lime']}]
-        },
-        options:{animation:false,scales:{y:{max:1023,min:0}}}
-    });
-    updateLoop();
-}
-
-function drawMap(x,y){
-    ctxMap.fillStyle="#111";
-    ctxMap.fillRect(0,0,200,200);
-    ctxMap.strokeStyle="#333";
-    for(let i=0;i<=200;i+=20){
-        ctxMap.beginPath();ctxMap.moveTo(i,0);ctxMap.lineTo(i,200);ctxMap.stroke();
-        ctxMap.beginPath();ctxMap.moveTo(0,i);ctxMap.lineTo(200,i);ctxMap.stroke();
+    function setDPR(c) {
+        const dpr = window.devicePixelRatio || 1;
+        const rect = c.getBoundingClientRect();
+        c.width = Math.max(1, Math.floor(rect.width * dpr));
+        // keep a square-ish compass, map similar
+        let cssH = rect.width; if (c===irCanvas) cssH = rect.width * 0.65; if (c===compassCanvas) cssH = rect.width;
+        c.height = Math.max(1, Math.floor(cssH * dpr));
+        const ctx = c.getContext('2d'); ctx.setTransform(dpr,0,0,dpr,0,0);
     }
-    lastPositions.push({x,y});
-    if(lastPositions.length>50) lastPositions.shift();
-    ctxMap.strokeStyle="lime";
-    ctxMap.beginPath();
-    lastPositions.forEach((p,i)=>{
-        const sx=100+p.x, sy=100-p.y;
-        if(i==0) ctxMap.moveTo(sx,sy); else ctxMap.lineTo(sx,sy);
-    });
-    ctxMap.stroke();
-    ctxMap.fillStyle="red";
-    ctxMap.beginPath();
-    ctxMap.arc(100+x,100-y,4,0,2*Math.PI);
-    ctxMap.fill();
-}
 
-function drawCompass(th){
-    ctxCompass.clearRect(0,0,120,120);
-    ctxCompass.beginPath(); ctxCompass.arc(60,60,50,0,2*Math.PI);
-    ctxCompass.strokeStyle="#555"; ctxCompass.stroke();
-    ctxCompass.save();
-    ctxCompass.translate(60,60);
-    ctxCompass.rotate(th*Math.PI/180);
-    ctxCompass.beginPath();
-    ctxCompass.moveTo(0,0); ctxCompass.lineTo(0,-40);
-    ctxCompass.strokeStyle="red"; ctxCompass.stroke();
-    ctxCompass.restore();
-    ctxCompass.fillStyle="#eee"; ctxCompass.fillText(th.toFixed(0)+"°",45,70);
-}
+    function resizeAll(){ [mapCanvas, compassCanvas, irCanvas].forEach(setDPR); }
 
-function updateLoop(){
-    fetch('/data')
-    .then(r=>r.json())
-    .then(j=>{
-        drawMap(j.x,j.y);
-        drawCompass(j.th);
-        irChart.data.datasets[0].data=j.ir;
-        irChart.data.datasets[0].backgroundColor=j.ir.map(v=>v>600?'red':'lime');
-        irChart.update();
-    })
-    .catch(err=>console.log(err));
-    setTimeout(updateLoop,500);
-}
+    function drawMap(x,y){ const ctx = mapCanvas.getContext('2d'); const w = mapCanvas.clientWidth, h = mapCanvas.clientHeight; ctx.clearRect(0,0,mapCanvas.width,mapCanvas.height); ctx.fillStyle='#111'; ctx.fillRect(0,0,w,h); ctx.strokeStyle='#333'; const step = Math.max(16, Math.round(Math.min(w,h)/10)); for(let i=0;i<=w;i+=step){ ctx.beginPath(); ctx.moveTo(i,0); ctx.lineTo(i,h); ctx.stroke(); } for(let i=0;i<=h;i+=step){ ctx.beginPath(); ctx.moveTo(0,i); ctx.lineTo(w,i); ctx.stroke(); } lastPositions.push({x,y}); if(lastPositions.length>80) lastPositions.shift(); ctx.strokeStyle='lime'; ctx.beginPath(); lastPositions.forEach((p,i)=>{ const sx=w/2 + p.x, sy=h/2 - p.y; if(i==0) ctx.moveTo(sx,sy); else ctx.lineTo(sx,sy); }); ctx.stroke(); ctx.fillStyle='red'; ctx.beginPath(); ctx.arc(w/2 + x, h/2 - y, Math.max(3, Math.min(8, w*0.02)), 0, 2*Math.PI); ctx.fill(); }
 
-// Mantenimiento de comando mientras se mantiene presionado (W y S)
-let holdInterval = null;
-let holdCmd = '';
+    function drawCompass(th){ const ctx = compassCanvas.getContext('2d'); const w = compassCanvas.clientWidth, h = compassCanvas.clientHeight; ctx.clearRect(0,0,compassCanvas.width,compassCanvas.height); const cx=w/2, cy=h/2, r=Math.min(w,h)/2-6; ctx.beginPath(); ctx.arc(cx,cy,r,0,2*Math.PI); ctx.strokeStyle='#555'; ctx.stroke(); ctx.save(); ctx.translate(cx,cy); ctx.rotate(th*Math.PI/180); ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(0,-r*0.8); ctx.strokeStyle='red'; ctx.stroke(); ctx.restore(); ctx.fillStyle='#eee'; ctx.fillText(Math.round(th)+'°',cx-10,cy+Math.round(r*0.5)); }
 
-function startHold(cmd){
-    // enviar inmediatamente y luego cada 200ms mientras esté presionado
-    if(holdInterval) clearInterval(holdInterval);
-    holdCmd = cmd;
-    fetch('/cmd?c='+cmd).catch(e=>console.log(e));
-    holdInterval = setInterval(()=>fetch('/cmd?c='+cmd).catch(e=>console.log(e)), 200);
-}
+    function drawIR(values){
+        const ctx = irCanvas.getContext('2d');
+        const w = irCanvas.clientWidth, h = irCanvas.clientHeight;
+        ctx.clearRect(0,0,irCanvas.width,irCanvas.height);
+        const padding = 8, gap = 8;
+        const bottomLabelArea = 18; // reserve space for sensor labels under bars
+        const barAreaW = w - padding*2;
+        const barWidth = (barAreaW - gap*(values.length-1)) / values.length;
+    const maxVal = 255; // ADC range is 0-255 on this board/config
+        // adaptive font sizes
+        const valFontSize = Math.max(10, Math.round(h * 0.08));
+        const nameFontSize = Math.max(10, Math.round(h * 0.06));
+        ctx.textAlign = 'center';
+        for (let i = 0; i < values.length; i++) {
+            const v = values[i];
+            const maxBarHeight = h - padding - bottomLabelArea;
+            const barH = Math.max(2, (v / maxVal) * maxBarHeight);
+            const x = padding + i * (barWidth + gap);
+            const y = h - bottomLabelArea - barH;
+            ctx.fillStyle = v > (maxVal * 0.6) ? 'red' : 'lime';
+            ctx.fillRect(x, y, barWidth, barH);
 
-function stopHold(){
-    if(holdInterval) clearInterval(holdInterval);
-    holdInterval = null;
-    holdCmd = '';
-    // enviar comando de paro
-    fetch('/cmd?c=X').catch(e=>console.log(e));
-}
+            // draw numeric value above the bar (or inside if too small)
+            ctx.fillStyle = '#fff';
+            ctx.font = valFontSize + 'px Arial';
+            const valueX = x + barWidth / 2;
+            const valueY = Math.max(12, y - 6);
+            ctx.fillText(String(v), valueX, valueY);
 
-function sendCmd(cmd){
-    fetch('/cmd?c='+cmd).catch(e=>console.log(e));
-}
+            // draw sensor short name centered below the bar
+            ctx.fillStyle = '#eee';
+            ctx.font = nameFontSize + 'px Arial';
+            const names = ['L','FL','B','FR','R'];
+            const name = (names[i] || 'S') + '';
+            const nameY = h - 4;
+            ctx.fillText(name, x + barWidth / 2, nameY);
+        }
+        // reset textAlign to default left for other drawings
+        ctx.textAlign = 'left';
+    }
+
+    function startHold(cmd){ if(window._holdInterval) clearInterval(window._holdInterval); fetch('/cmd?c='+cmd).catch(()=>{}); window._holdInterval = setInterval(()=>fetch('/cmd?c='+cmd).catch(()=>{}),200); }
+    function stopHold(){ if(window._holdInterval) { clearInterval(window._holdInterval); window._holdInterval = null; } fetch('/cmd?c=X').catch(()=>{}); }
+    function sendCmd(cmd){ fetch('/cmd?c='+cmd).catch(()=>{}); }
+
+    function updateLoop(){ fetch('/data').then(r=>r.json()).then(j=>{ drawMap(j.x,j.y); drawCompass(j.th); drawIR(j.ir); statusText.textContent = `x:${j.x.toFixed(2)} y:${j.y.toFixed(2)} th:${j.th.toFixed(0)}°`; }).catch(()=>{ statusText.textContent='No telemetría'; }); setTimeout(updateLoop,500); }
+
+    window.addEventListener('load', ()=>{ resizeAll(); window.addEventListener('resize', resizeAll); updateLoop(); });
+    window.addEventListener('orientationchange', ()=> setTimeout(resizeAll,250));
+    </script>
+    <script>
+        // Evitar selección por long-press en áreas no editables, pero permitir en inputs/selects
+        document.addEventListener('selectstart', function(e) {
+            const t = e.target && e.target.tagName;
+            if (t !== 'INPUT' && t !== 'TEXTAREA' && t !== 'SELECT') e.preventDefault();
+        }, false);
+        // Evitar el menú contextual por long-press en botones (útil en móviles)
+        document.addEventListener('contextmenu', function(e){ if (e.target && e.target.tagName === 'BUTTON') e.preventDefault(); }, false);
+        // Quitar highlight táctil adicional en todos los botones (estilo redundante)
+        Array.from(document.querySelectorAll('button')).forEach(b=>{ b.style.webkitTapHighlightColor = 'transparent'; });
     </script>
 </body>
 </html>
 )rawliteral";
-
-// Forward declarations (evitan problemas con la generación automática de prototipos
-// cuando se usan literales raw o PROGMEM grandes)
-void setupWiFi();
-void handleClient(WiFiClient client);
-void handleWiFiServer();
-void processCommand(char cmd);
-void handleAutoTurn();
-void startAutoTurn(float angleDelta);
-void showHelp();
-
 // Nota: Este sketch controla el robot AMR. Está organizado en secciones
 // claras: librerías, instancias globales, variables de control, setup,
 // loop principal, procesamiento de comandos, rutinas de giro y utilidades.
@@ -222,6 +486,102 @@ void showHelp();
 MotorDriver motors;
 Encoder encoders;
 Odometry odometry(&encoders);
+
+// ----------------------
+// Route execution state
+// ----------------------
+enum RouteState { ROUTE_IDLE=0, ROUTE_WAITING, ROUTE_TURNING, ROUTE_MOVING, ROUTE_DONE };
+struct RouteExecution {
+    bool active = false;
+    int routeIndex = 0;
+    int direction = 1; // 1 = ida, -1 = retorno
+    unsigned long requestMillis = 0;
+    unsigned long delayMs = 0;
+    int currentPoint = 0; // 0..(n-1)
+    RouteState state = ROUTE_IDLE;
+    bool awaitingConfirm = false;
+    // movement bookkeeping
+    long moveStartLeft = 0;
+    long moveStartRight = 0;
+    long moveTargetPulses = 0;
+    float targetX = 0.0f;
+    float targetY = 0.0f;
+} routeExec;
+
+// Helper: stop/abort execution
+void stopRouteExecution() {
+    if (!routeExec.active) return;
+    routeExec.active = false;
+    routeExec.state = ROUTE_IDLE;
+    motors.stop();
+    Serial.println(F("Route execution aborted"));
+}
+
+// helper to normalize angle to [-180,180]
+float normalizeAngle(float a) {
+    while (a > 180.0f) a -= 360.0f;
+    while (a < -180.0f) a += 360.0f;
+    return a;
+}
+
+// begin the next waypoint (calculate turn and start it)
+void beginNextWaypoint() {
+    int idx = routeExec.routeIndex;
+    if (idx < 0 || idx >= ROUTE_COUNT) { stopRouteExecution(); return; }
+    int count = routesCounts[idx];
+    if (routeExec.currentPoint >= count) {
+        // finished
+        routeExec.active = false;
+        routeExec.state = ROUTE_DONE;
+        motors.stop();
+        Serial.println(F("Route finished"));
+        return;
+    }
+
+    int pIndex = (routeExec.direction == 1) ? routeExec.currentPoint : (count - 1 - routeExec.currentPoint);
+    routeExec.targetX = routesPoints[idx][pIndex].x;
+    routeExec.targetY = routesPoints[idx][pIndex].y;
+
+    // compute heading and angle delta
+    float curX = odometry.getX();
+    float curY = odometry.getY();
+    float curTh = odometry.getThetaDegrees();
+    float dx = routeExec.targetX - curX;
+    float dy = routeExec.targetY - curY;
+    float desired = atan2f(dy, dx) * 180.0f / PI;
+    float delta = normalizeAngle(desired - curTh);
+
+    Serial.print(F("Going to waypoint: "));
+    Serial.print(routeExec.targetX); Serial.print(F(",")); Serial.println(routeExec.targetY);
+    Serial.print(F("Turn delta: ")); Serial.println(delta);
+
+    // start turn using existing routine
+    startAutoTurn(delta);
+    routeExec.state = ROUTE_TURNING;
+}
+
+// schedule route execution
+bool startRouteExecution(int routeIndex, bool retorno, unsigned long delayMilliseconds) {
+    if (routeExec.active) return false;
+    if (routeIndex < 0 || routeIndex >= ROUTE_COUNT) return false;
+    routeExec.active = true;
+    routeExec.routeIndex = routeIndex;
+    routeExec.direction = retorno ? -1 : 1;
+    routeExec.requestMillis = millis();
+    routeExec.delayMs = delayMilliseconds;
+    routeExec.currentPoint = 0;
+    routeExec.state = (delayMilliseconds > 0) ? ROUTE_WAITING : ROUTE_IDLE;
+    // require operator confirmation by default; will auto-start when delay expires
+    routeExec.awaitingConfirm = true;
+
+    Serial.print(F("Route scheduled: "));
+    Serial.print(routeNames[routeIndex]);
+    Serial.print(F(" retorno:")); Serial.print(retorno ? 1 : 0);
+    Serial.print(F(" delay_ms:")); Serial.println(delayMilliseconds);
+
+    if (delayMilliseconds == 0) beginNextWaypoint();
+    return true;
+}
 
 // --------------------------------------------------------------------------------
 // Nota sobre las instancias:
@@ -255,6 +615,12 @@ const unsigned int TICK_PRINT_INTERVAL = 100; // ms
 long tickPrintLeft0 = 0;
 long tickPrintRight0 = 0;
 
+// Variables para control PID de velocidad
+long lastEncoderLeftCount = 0;
+long lastEncoderRightCount = 0;
+unsigned long lastPIDMillis = 0;
+const unsigned int DEFAULT_PID_INTERVAL = 50; // ms
+
 // ======== MUESTREO CONTINUO IR (caso 'K') ========
 struct IRSampler {
     int samplesPerRead;      // número de lecturas por sensor por ciclo
@@ -264,6 +630,36 @@ struct IRSampler {
 };
 
 IRSampler* irSampler = nullptr;
+
+// Simple circular log buffer to capture important messages (also mirrored to Serial)
+const int LOG_LINES = 64;
+String logBuffer[LOG_LINES];
+int logIndex = 0; // next insertion index
+
+void addLogLine(const String &s) {
+    logBuffer[logIndex] = s;
+    logIndex++;
+    if (logIndex >= LOG_LINES) logIndex = 0;
+}
+
+// Helpers that print to Serial and also store to buffer (overloads for flash strings)
+void logPrint(const __FlashStringHelper *fs) { String tmp = String(fs); Serial.print(fs); addLogLine(tmp); }
+void logPrintln(const __FlashStringHelper *fs) { String tmp = String(fs); Serial.println(fs); addLogLine(tmp); }
+void logPrint(const String &s) { Serial.print(s); addLogLine(s); }
+void logPrintln(const String &s) { Serial.println(s); addLogLine(s); }
+
+String getLogsText() {
+    String out = "";
+    // start from the oldest message
+    for (int i = 0; i < LOG_LINES; ++i) {
+        int idx = (logIndex + i) % LOG_LINES;
+        if (logBuffer[idx].length() > 0) {
+            out += logBuffer[idx];
+            out += '\n';
+        }
+    }
+    return out;
+}
 
 // -------------------------------------------------------------------------------
 // Notas sobre las variables de control:
@@ -295,7 +691,7 @@ const int IR_RIGHT_SIDE_PIN  = A5; // Lateral derecho
 
 // Parámetros de lectura
 const int IR_NUM_SAMPLES = 3;      // número de lecturas para promediar
-int IR_THRESHOLD = 600;            // umbral por defecto (0-1023). Ajustar por calibración
+int IR_THRESHOLD = 150;            // umbral por defecto (0-255). Ajustar por calibración
 
 // Estructura para devolver lecturas
 struct IRSensors {
@@ -395,6 +791,17 @@ void sendIRTelemetry(const IRSensors &s) {
 // ========================================
 //              SETUP
 // ========================================
+// Forward declarations used because large PROGMEM literals can confuse
+// the automatic prototype generator. Keep prototypes for functions
+// referenced before their definitions.
+void setupWiFi();
+void handleClient(WiFiClient client);
+void handleWiFiServer();
+void processCommand(char cmd);
+void handleAutoTurn();
+void startAutoTurn(float angleDelta);
+void showHelp();
+
 void setup() {
     Serial.begin(115200);
     
@@ -451,6 +858,50 @@ void loop() {
     // Manejar giros automáticos
     handleAutoTurn();
 
+    // Route execution state machine
+    if (routeExec.active) {
+        unsigned long now = millis();
+        if (routeExec.state == ROUTE_WAITING) {
+            if (now - routeExec.requestMillis >= routeExec.delayMs) {
+                // start now
+                beginNextWaypoint();
+            }
+        } else if (routeExec.state == ROUTE_TURNING) {
+            // wait for turningInProgress to finish (handled by handleAutoTurn)
+            if (!turningInProgress) {
+                // start moving towards target
+                float dx = routeExec.targetX - odometry.getX();
+                float dy = routeExec.targetY - odometry.getY();
+                float dist = sqrtf(dx*dx + dy*dy);
+                // compute pulses required
+                float pulsesF = (dist / (float)WHEEL_CIRCUMFERENCE_CM) * (float)encoders.getPulsesPerRevolution();
+                routeExec.moveTargetPulses = (long)(pulsesF + 0.5f);
+                routeExec.moveStartLeft = encoders.readLeft();
+                routeExec.moveStartRight = encoders.readRight();
+                if (routeExec.moveTargetPulses <= 0) {
+                    // nothing to move, advance
+                    routeExec.currentPoint++;
+                    beginNextWaypoint();
+                } else {
+                    motors.moveForward();
+                    routeExec.state = ROUTE_MOVING;
+                    Serial.print(F("Moving pulses: ")); Serial.println(routeExec.moveTargetPulses);
+                }
+            }
+        } else if (routeExec.state == ROUTE_MOVING) {
+            long dl = labs(encoders.readLeft() - routeExec.moveStartLeft);
+            long dr = labs(encoders.readRight() - routeExec.moveStartRight);
+            long maxm = (dl > dr) ? dl : dr;
+            if (maxm >= routeExec.moveTargetPulses) {
+                motors.stop();
+                routeExec.currentPoint++;
+                // small pause before next waypoint
+                delay(80);
+                beginNextWaypoint();
+            }
+        }
+    }
+
     // Si estamos en modo impresión de tics mientras avanzamos (comando 'W')
     if (printTicksWhileMoving && millis() - lastTickPrintMillis >= TICK_PRINT_INTERVAL) {
         long dl = encoders.readLeft() - tickPrintLeft0;
@@ -465,6 +916,21 @@ void loop() {
     }
     
     delay(5); // Pequeña pausa para estabilidad
+
+    // --- PID velocity update (called regularly) ---
+    unsigned long nowPid = millis();
+    if (nowPid - lastPIDMillis >= DEFAULT_PID_INTERVAL) {
+        long curL = encoders.readLeft();
+        long curR = encoders.readRight();
+        long dL = curL - lastEncoderLeftCount;
+        long dR = curR - lastEncoderRightCount;
+        unsigned long dt = nowPid - lastPIDMillis;
+        // call motor driver to update velocity control (it will be no-op if disabled)
+        motors.updateVelocityControl(dL, dR, dt);
+        lastEncoderLeftCount = curL;
+        lastEncoderRightCount = curR;
+        lastPIDMillis = nowPid;
+    }
 
     // manejar cliente WiFi (dashboard server)
     handleWiFiServer();
@@ -554,11 +1020,7 @@ void processCommand(char cmd) {
             Serial.println(F("Giro Izq continuo (hasta X)"));
             motors.turnLeft();
             break;
-            
-        
-
-        // Removed debug tests (Z, Y) to keep only essential tests
-            
+                        
         case 'E':
             // Giro continuo a la derecha hasta recibir 'X'
             Serial.println(F("Giro Der continuo (hasta X)"));
@@ -660,6 +1122,26 @@ void processCommand(char cmd) {
     case 'T':
             Serial.println(F("Test"));
             motors.testMotors();
+            break;
+
+        case 'Y':
+            // ENABLE velocity PID with a safe default target (1 rev/sec)
+            {
+                int ppr = encoders.getPulsesPerRevolution();
+                float targetPps = (float)ppr * 1.0f; // 1 revolution per second
+                motors.setPIDGains(0.08f, 0.02f, 0.002f); // defaults (tune on HW)
+                motors.setRampTime(800);
+                motors.setPIDInterval(DEFAULT_PID_INTERVAL);
+                motors.setTargetPulsesPerSecond(targetPps, targetPps);
+                motors.enableVelocityControl(true);
+                Serial.print(F("PID enabled. target pps: ")); Serial.println(targetPps);
+            }
+            break;
+
+        case 'U':
+            // Disable velocity PID
+            motors.enableVelocityControl(false);
+            Serial.println(F("PID disabled"));
             break;
             
         // 'M' (diagnóstico motor derecho) removed - mantiene solo el test completo 'T'
@@ -840,6 +1322,140 @@ void handleClient(WiFiClient client) {
     String req = client.readStringUntil('\r');
     client.flush();
 
+    // Serve routes JSON
+    if (req.indexOf("GET /routes ") >= 0 || req.indexOf("GET /routes\r") >= 0 || req.indexOf("GET /routes?") >= 0) {
+        // Build JSON array of routes
+        String json = "[";
+        for (int i = 0; i < ROUTE_COUNT; ++i) {
+            if (i) json += ",";
+            json += "{";
+            json += "\"name\":\"" + String(routeNames[i]) + "\",";
+            json += "\"points\":[";
+            for (int j = 0; j < routesCounts[i]; ++j) {
+                if (j) json += ",";
+                float px = routesPoints[i][j].x;
+                float py = routesPoints[i][j].y;
+                json += "{";
+                json += "\"x\":" + String(px, 3) + ",";
+                json += "\"y\":" + String(py, 3);
+                json += "}";
+            }
+            json += "]}";
+        }
+        json += "]";
+
+        client.println(F("HTTP/1.1 200 OK"));
+        client.println(F("Content-Type: application/json"));
+        client.println(F("Connection: close"));
+        client.println();
+        client.print(json);
+        return;
+    }
+
+    // Serve the routes UI page
+    if (req.indexOf("GET /routes_ui") >= 0) {
+        client.println(F("HTTP/1.1 200 OK"));
+        client.println(F("Content-Type: text/html"));
+        client.println(F("Connection: close"));
+        client.println();
+        client.print(reinterpret_cast<const __FlashStringHelper*>(routesPageHTML));
+        return;
+    }
+
+    // Return route execution status JSON
+    if (req.indexOf("GET /route_status") >= 0) {
+        String json = "{";
+        json += "\"active\":" + String(routeExec.active ? 1 : 0) + ",";
+        json += "\"state\":" + String((int)routeExec.state) + ",";
+        json += "\"routeIndex\":" + String(routeExec.routeIndex) + ",";
+        json += "\"direction\":" + String(routeExec.direction) + ",";
+        json += "\"currentPoint\":" + String(routeExec.currentPoint) + ",";
+        json += "\"awaitingConfirm\":" + String(routeExec.awaitingConfirm ? 1 : 0) + ",";
+        json += "\"targetX\":" + String(routeExec.targetX,3) + ",";
+        json += "\"targetY\":" + String(routeExec.targetY,3) + ",";
+        unsigned long remaining = 0;
+        if (routeExec.state == ROUTE_WAITING) {
+            unsigned long elapsed = millis() - routeExec.requestMillis;
+            if (elapsed < routeExec.delayMs) remaining = routeExec.delayMs - elapsed;
+        }
+        json += "\"remainingDelayMs\":" + String(remaining);
+        json += "}";
+        client.println(F("HTTP/1.1 200 OK"));
+        client.println(F("Content-Type: application/json"));
+        client.println(F("Connection: close"));
+        client.println();
+        client.print(json);
+        return;
+    }
+
+    // Confirm scheduled route start early: /confirm_route
+    if (req.indexOf("GET /confirm_route") >= 0) {
+        if (routeExec.active && routeExec.state == ROUTE_WAITING && routeExec.awaitingConfirm) {
+            routeExec.awaitingConfirm = false;
+            // start immediately
+            beginNextWaypoint();
+            client.println(F("HTTP/1.1 200 OK\r\nConnection: close\r\n\r\nCONFIRMED"));
+        } else {
+            client.println(F("HTTP/1.1 409 Conflict\r\nConnection: close\r\n\r\nNO_SCHEDULE"));
+        }
+        return;
+    }
+
+    // Start route execution: /start_route?route=0&dir=ida|retorno&delay=ms
+    if (req.indexOf("GET /start_route") >= 0) {
+        int rIdx = 0;
+        bool retorno = false;
+        unsigned long delayMs = 0;
+        int p;
+        p = req.indexOf("route=");
+        if (p >= 0) {
+            p += 6;
+            String num;
+            while (p < req.length()) {
+                char ch = req[p];
+                if (ch >= '0' && ch <= '9') { num += ch; p++; } else break;
+            }
+            rIdx = num.toInt();
+        }
+        p = req.indexOf("dir=");
+        if (p >= 0) {
+            p += 4;
+            String d;
+            while (p < req.length()) {
+                char ch = req[p];
+                if (ch == '&' || ch == ' ' || ch == '\r') break;
+                d += ch; p++;
+            }
+            d.toLowerCase();
+            if (d.indexOf("ret") >= 0) retorno = true;
+        }
+        p = req.indexOf("delay=");
+        if (p >= 0) {
+            p += 6;
+            String num;
+            while (p < req.length()) {
+                char ch = req[p];
+                if (ch >= '0' && ch <= '9') { num += ch; p++; } else break;
+            }
+            delayMs = (unsigned long)num.toInt();
+        }
+
+        bool ok = startRouteExecution(rIdx, retorno, delayMs);
+        if (ok) {
+            client.println(F("HTTP/1.1 200 OK\r\nConnection: close\r\n\r\nOK"));
+        } else {
+            client.println(F("HTTP/1.1 409 Conflict\r\nConnection: close\r\n\r\nBUSY"));
+        }
+        return;
+    }
+
+    // Stop route execution: /stop_route
+    if (req.indexOf("GET /stop_route") >= 0) {
+        stopRouteExecution();
+        client.println(F("HTTP/1.1 200 OK\r\nConnection: close\r\n\r\nSTOPPED"));
+        return;
+    }
+
     if (req.indexOf("GET /data") >= 0) {
         IRSensors s = readIRSensors();
         float x = odometry.getX();
@@ -874,7 +1490,10 @@ void handleClient(WiFiClient client) {
     client.println(F("Content-Type: text/html"));
     client.println(F("Connection: close"));
     client.println();
-        client.print(dashboardHTML);
+    // `dashboardHTML` is stored in flash (PROGMEM). Cast to
+    // __FlashStringHelper so Print::print handles it correctly
+    // and the full HTML is streamed to the client without truncation.
+    client.print(reinterpret_cast<const __FlashStringHelper*>(dashboardHTML));
 }
 
 void handleWiFiServer() {
