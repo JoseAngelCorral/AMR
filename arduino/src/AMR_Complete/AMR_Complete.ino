@@ -1003,21 +1003,28 @@ void processCommand(char cmd) {
     // MOVIMIENTO: Adelante / Atrás / Giros
     // ---------------------------
     case 'W':
-            Serial.println(F("Adelante"));
-            // Iniciar impresión de tics mientras avanzamos
-            tickPrintLeft0 = encoders.readLeft();
-            tickPrintRight0 = encoders.readRight();
-            lastTickPrintMillis = millis();
-            printTicksWhileMoving = true;
-            Serial.print(F("Imprimiendo tics cada "));
-            Serial.print(TICK_PRINT_INTERVAL);
-            Serial.println(F(" ms"));
-            motors.moveForward();
+            Serial.println(F("Adelante (manual hold)"));
+            // manual forward at 40% PWM while holding
+            {
+                int manualFwdSpeed = (int)(MAX_SPEED * 0.40f);
+                // Iniciar impresión de tics mientras avanzamos
+                tickPrintLeft0 = encoders.readLeft();
+                tickPrintRight0 = encoders.readRight();
+                lastTickPrintMillis = millis();
+                printTicksWhileMoving = true;
+                Serial.print(F("Imprimiendo tics cada "));
+                Serial.print(TICK_PRINT_INTERVAL);
+                Serial.println(F(" ms"));
+                motors.moveForward(manualFwdSpeed);
+            }
             break;
             
         case 'S':
-            Serial.println(F("Atras"));
-            motors.moveBackward();
+            Serial.println(F("Atras (manual hold)"));
+            {
+                int manualBackSpeed = (int)(MAX_SPEED * 0.40f);
+                motors.moveBackward(manualBackSpeed);
+            }
             break;
             
     case 'A':
