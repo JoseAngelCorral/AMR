@@ -6,10 +6,11 @@
 #include <Arduino.h>
 
 // Configuración del encoder
-// Observación: durante la inspección los contadores mostraron ~3389-3446 pulsos
-// por vuelta. Para reflejar el valor real medido ajustamos PULSES_PER_REVOLUTION
-// a ese valor promedio. Si calibras de nuevo, actualiza este número.
-#define DEFAULT_PULSES_PER_REVOLUTION 3100  // Valor por defecto (ajústalo si calibras)
+// Observación: durante la inspección y la prueba "Avanzar 1 vuelta" (comando 'V') los
+// contadores mostraron un valor consistente cercano a 3418 pulsos por revolución.
+// Actualizamos el valor por defecto para reflejar esta medición. Si vuelves a
+// calibrar con la prueba 'V', ajusta este número.
+#define DEFAULT_PULSES_PER_REVOLUTION 3418  // Valor por defecto (ajustado tras medición)
 #define WHEEL_DIAMETER_CM 15.50       // Diámetro de la rueda en centímetros
 #define WHEEL_CIRCUMFERENCE_CM (PI * WHEEL_DIAMETER_CM)  // Circunferencia en cm
 

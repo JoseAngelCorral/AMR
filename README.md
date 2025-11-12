@@ -2,7 +2,7 @@
 
 ## 📋 Descripción del Proyecto
 
-Sistema completo de control para robot móvil autónomo basado en Arduino Uno (o UNO R4 WiFi) con control de motores, odometría, interfaz web y navegación por teclado/táctil. El robot incluye encoders, drivers de motor BTS7960 y capacidades de tracking de posición en tiempo real.
+Sistema completo de control para robot móvil autónomo basado en Arduino Uno (o UNO R4 WiFi) con control de motores, odometría, interfaz web y navegación por táctil. El robot incluye encoders, drivers de motor BTS7960 y capacidades de tracking de posición en tiempo real.
 
 ## 🛠️ Hardware Requerido
 
@@ -282,6 +282,7 @@ AMR/
  - ✅ Hold-to-turn y hold-to-move en la UI (W/S/Q/E)
  - ✅ Ajustes manuales: giro 20% PWM, avance/retroceso 40% PWM
  - ✅ Endpoints REST simples para rutas y telemetría
+ - ✅ Pulsos por revolución (PPR) calibrado por prueba 'V' (Avanzar 1 vuelta): DEFAULT_PULSES_PER_REVOLUTION = 3418
 
 ## 🔮 Desarrollo Futuro
 
