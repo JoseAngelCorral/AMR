@@ -2,7 +2,7 @@
 
 ## 📋 Descripción del Proyecto
 
-Sistema completo de control para robot móvil autónomo basado en Arduino Uno con control de motores, odometría y navegación por teclado. El robot incluye encoders rotativos, drivers de motor BTS7960 y capacidades de tracking de posición en tiempo real.
+Sistema completo de control para robot móvil autónomo basado en Arduino Uno (o UNO R4 WiFi) con control de motores, odometría, interfaz web y navegación por teclado/táctil. El robot incluye encoders, drivers de motor BTS7960 y capacidades de tracking de posición en tiempo real.
 
 ## 🛠️ Hardware Requerido
 
@@ -128,6 +128,20 @@ Acciones sugeridas en el robot:
 - **`D`** - Girar 90° a la derecha  
 - **`X`** - Parar todos los motores
 
+### Controles manuales en el dashboard (UI)
+- En la interfaz web (dashboard) se dispone de una cruceta (D-pad) táctil con los mismos comandos:
+	- Mantener pulsado `↑ Adelante` emite `W` en modo hold y avanza mientras está pulsado.
+	- Mantener pulsado `↓ Atrás` emite `S` en modo hold y retrocede mientras está pulsado.
+	- Mantener pulsado `← Izq` emite `Q` en modo hold y produce un giro manual en sitio mientras se mantiene pulsado.
+	- Mantener pulsado `Der →` emite `E` en modo hold y gira manual en sitio mientras se mantiene pulsado.
+	- El botón central `⏹ Stop` envía `X`.
+
+Velocidades manuales por defecto implementadas:
+- Giro manual (Q/E): 20% PWM de `MAX_SPEED` (para giros lentos y controlables en sitio).
+- Avance/retroceso manual (W/S): 40% PWM de `MAX_SPEED` (más estable para control táctil).
+
+Nota: los giros automáticos por 90° siguen manteniéndose con `A`/`D` y usan el cálculo por encoders (`startAutoTurn`) — la funcionalidad automática de 90° no cambió.
+
 ### Comandos de Información:
 - **`P`** - Mostrar posición actual (x,y,θ)
 - **`R`** - Reset posición a origen (0,0,0°)
@@ -142,6 +156,17 @@ Acciones sugeridas en el robot:
 - **Baudios**: 115200
 - **Protocolo**: Comandos de un solo carácter
 - **Respuesta**: Confirmación y estado por Serial Monitor
+
+### Endpoints Web (Dashboard)
+- `GET /` - Página principal (dashboard)
+- `GET /data` - Telemetría en JSON: posición y lecturas IR
+- `GET /routes` - Lista de rutas (JSON)
+- `GET /routes_ui` - Página de UI para selección e inicio de rutas
+- `GET /start_route?route=<i>&dir=ida|retorno&delay=<ms>` - Programar ejecución de ruta
+- `GET /stop_route` - Detener ejecución de ruta
+- `GET /route_status` - Estado de ejecución de ruta (JSON)
+- `GET /confirm_route` - Confirmar inicio programado (inicia inmediatamente si estaba en espera)
+- `GET /cmd?c=<CHAR>` - Enviar comando simple desde la UI (ej: `c=W`)
 
 ### Ejemplo de uso:
 ```
@@ -201,7 +226,7 @@ AMR/
 ### 3. Operación:
 ```bash
 1. Abrir Serial Monitor (115200 baudios)
-2. Enviar comandos individuales (W/A/S/D/X/P/R/T/M/H)
+2. Enviar comandos individuales (W/A/S/D/X/P/R/T/I/K/H) o usar el dashboard web
 3. Observar respuestas del sistema
 ```
 
@@ -253,6 +278,10 @@ AMR/
 - ✅ Interfaz serial interactiva
 - ✅ Gestión de memoria optimizada
 - ✅ Manejo de interrupciones para encoders
+ - ✅ Interfaz web/Dashboard con D-pad táctil
+ - ✅ Hold-to-turn y hold-to-move en la UI (W/S/Q/E)
+ - ✅ Ajustes manuales: giro 20% PWM, avance/retroceso 40% PWM
+ - ✅ Endpoints REST simples para rutas y telemetría
 
 ## 🔮 Desarrollo Futuro
 
