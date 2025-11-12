@@ -189,9 +189,41 @@ OK
 - **Precisión**: Submilimétrica en distancias cortas
 
 ### Cálculos:
-- **Distancia por pulso**: π × 16cm ÷ 1200 = 0.0419 cm/pulso
-- **Wheelbase**: Distancia entre ruedas (configurable)
-- **Algoritmo**: Odometría diferencial con integración de Euler
+- **Distancia por pulso (cm/pulse)**: se calcula como \(\pi \times \text{WHEEL_DIAMETER_CM} / PPR\).
+- Con los valores actuales del proyecto:
+- - Diámetro rueda: 15.50 cm
+- - Pulsos por revolución (PPR) por defecto calibrado: 3418
+- - Circunferencia = π × 15.50 ≈ 48.6947 cm
+- - Distancia por pulso ≈ 48.6947 / 3418 ≈ 0.014245 cm/pulso (≈ 0.14245 mm/pulso)
+ - **Wheelbase**: Distancia entre ruedas (configurable)
+ - **Algoritmo**: Odometría diferencial con integración de Euler
+
+### Calibración y métricas por tic (pulsos)
+
+El sketch incluye utilidades y pruebas para calibrar los encoders. Resumen de comportamiento y métricas:
+
+- Valor PPR por defecto (definido en `Encoder.h`) se actualizó tras la prueba `V` ("Avanzar 1 vuelta") a: **3418 PPR**.
+- `Encoder::init()` imprime en Serial los valores calculados en el arranque: `cm/pulse`, `deg/pulse(single)` y `deg/pulse(pair)`.
+- Fórmulas:
+	- cm por tic = circunferencia / PPR = (π × WHEEL_DIAMETER_CM) / PPR
+	- grados por tic (rueda única, la otra parada):
+		deg_per_tick_single = (cm_por_tic / WHEEL_BASE_CM) × (180/π)
+	- grados por tic (giro en sitio, rueda A adelante y B atrás):
+		deg_per_tick_pair = 2 × deg_per_tick_single
+
+Con los valores actuales (ejemplo numérico):
+- cm/tick ≈ 0.014245 cm/tick (≈ 0.14245 mm/tick)
+- deg/tick (single) ≈ 0.01285° por tick
+- deg/tick (pair) ≈ 0.02569° por tick
+
+Notas prácticas:
+- La odometría (`Odometry::update()`) usa `Encoder::pulsesToCentimeters()` para convertir los pulsos a cm y calcula:
+	- deltaDistance = (deltaLeftCm + deltaRightCm) / 2
+	- deltaTheta (rad) = (deltaRightCm - deltaLeftCm) / WHEEL_BASE_CM
+	por lo que cualquier cambio en PPR afecta directamente a la precisión de la odometría.
+- El comando de prueba `V` calcula el PPR medido en tiempo de ejecución y llama a `encoders.setPulsesPerRevolution(measured)` — esto actualiza `Encoder::pulsesPerRevolution` inmediatamente sin necesidad de recompilar.
+- Recomendación: ejecutar la prueba `V` varias veces y promediar los resultados para obtener un PPR más estable antes de fijarlo.
+- Persistencia: si quieres que el PPR calibrado se mantenga tras resets, podemos guardar el valor en EEPROM y cargarlo en `setup()` — puedo añadir esa funcionalidad si lo deseas.
 
 ## 📁 Estructura del Proyecto
 
