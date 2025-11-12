@@ -351,7 +351,17 @@ void MotorDriver::updateVelocityControl(long leftDeltaPulses, long rightDeltaPul
     pwmL = constrain(pwmL, -MAX_SPEED, MAX_SPEED);
     pwmR = constrain(pwmR, -MAX_SPEED, MAX_SPEED);
 
-    // Apply to motors
+    // PROTECTION LAYER: interpolate between left/right PWM outputs to
+    // produce a single, balanced PWM value and apply it to both motors.
+    // This reduces curved motion caused by small mismatches between the
+    // two PID controllers. We take the average (linear interpolation).
+    int pwmProtected = (int)roundf(((float)pwmL + (float)pwmR) / 2.0f);
+
+    // Optionally, one could apply a deadband or smoothing here. For now
+    // we send the averaged PWM to both motors to keep speeds matched.
+    pwmL = pwmR = constrain(pwmProtected, -MAX_SPEED, MAX_SPEED);
+
+    // Apply the protected (balanced) PWM to both motors
     setBothMotors(pwmL, pwmR);
 
     // Optional debug print (comment/uncomment for tuning)
