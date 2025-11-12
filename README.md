@@ -103,6 +103,3 @@ Consejos prácticos de cableado y pruebas
 - Si un motor gira en sentido opuesto al esperado, intercambia las salidas
 	RPWM/LPWM en el cableado del BTS7960 (o modifica la lógica en
 	`MotorDriver.cpp`).
-
-¿Quieres que añada un diagrama de conexión ASCII o una imagen SVG en `docs/`?
-Puedo generar un diagrama con las conexiones anteriores y añadirlo al repo.

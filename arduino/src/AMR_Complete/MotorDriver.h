@@ -19,7 +19,7 @@
 // Velocidades para BTS7960 (más potente que L298N)
 // Valores ajustados: ver README/AMR_Complete para porcentajes
 #define DEFAULT_SPEED 170    // Velocidad por defecto (0-255)
-#define TURN_SPEED 140       // Velocidad para giros
+#define TURN_SPEED 50       // Velocidad para giros
 #define MAX_SPEED 255        // Velocidad máxima
 #define MIN_SPEED 80         // Velocidad mínima para superar fricción
 
