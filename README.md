@@ -103,3 +103,69 @@ Consejos prácticos de cableado y pruebas
 - Si un motor gira en sentido opuesto al esperado, intercambia las salidas
 	RPWM/LPWM en el cableado del BTS7960 (o modifica la lógica en
 	`MotorDriver.cpp`).
+
+## ✅ Tests y funcionamiento de las pruebas
+
+El firmware incluye utilidades de prueba para verificar motores y calibrar
+los encoders desde Serial. Ejecuta las pruebas con el Serial Monitor a
+115200 baudios.
+
+- Comando `T` — Test completo de motores
+	- Qué hace: ejecuta una secuencia automática de pruebas en ambos motores:
+		1) Motor izquierdo adelante (LPWM activo) durante 1s
+		2) Motor izquierdo atrás (RPWM activo) durante 1s
+		3) Motor derecho adelante (LPWM activo) durante 1s
+		4) Motor derecho atrás (RPWM activo) durante 1s
+	- Salidas por Serial: mensajes de inicio y pasos como `Izq+`, `Izq-`, `Der+`,
+		`Der-` y finalmente `Test OK`.
+	- Seguridad: puedes ejecutar `T` con el BTS7960 sin alimentar (solo Arduino
+		conectado) para comprobar que las salidas PWM cambian sin mover los
+		motores; después conecta la fuente de motor (GND común) y repite con
+		precaución.
+
+- Comando `V` — Avanzar exactamente 1 vuelta (calibración PPR)
+	- Qué hace: arranca el movimiento hacia adelante y espera hasta que la
+		rueda que más ha girado alcance el número de pulsos definido en
+		`encoders.getPulsesPerRevolution()` (valor por defecto o calibrado).
+	- Proceso:
+		1) Lee contadores iniciales (left0/right0) y obtiene `target = pulsesPerRevolution`.
+		2) Llama a `motors.moveForward()` (usa la velocidad por defecto `DEFAULT_SPEED`).
+		3) Mide continuamente los incrementos de tics e imprime periódicamente
+			 `Ticks L:<n> R:<n> Avg:<n> Max:<n>` hasta que `Max >= target`.
+		4) Para los motores, calcula el pulso medido por revolución (la rueda
+			 que registró más pulsos) y actualiza en runtime
+			 `encoders.setPulsesPerRevolution(measured)`.
+	- Salidas por Serial: impresiones de progreso y líneas finales como
+		`Measured pulses/rev:<n>` y `Pulses_per_rev updated to: <n>` y `Hecho: 1 vuelta`.
+	- Uso: repetir la prueba varias veces y promediar los resultados para una
+		calibración más estable. Si quieres persistir el valor entre reinicios,
+		puedo añadir almacenamiento en EEPROM.
+
+- Función `testRightMotor()` (en `MotorDriver.cpp`) — test específico del motor
+	- Existe como API interna y realiza una prueba larga del motor derecho
+		(Pin6 adelante, Pin5 atrás). Si deseas un comando Serial corto (ej. `M`)
+		que invoque esta función, lo puedo añadir al menú de comandos.
+
+## 📊 Tabla de velocidades (PWM) — manual y automático
+
+La tabla siguiente resume los valores actuales usados en firmware (valores
+basados en constantes definidas en `MotorDriver.h` y uso en
+`AMR_Complete.ino`):
+
+| Modo | Acción | Valor PWM (aprox.) | % de MAX (255) | Comentarios |
+|---|---:|---:|---:|---|
+| Manual | Adelante / Atrás (hold - `W` / `S`) | 102 | 40% | Implementado como (int)(MAX_SPEED * 0.40f) |
+| Manual | Giro en sitio (hold - `Q` / `E`) | 51 | 20% | Implementado como (int)(MAX_SPEED * 0.20f); `turnLeft/turnRight` permiten < MIN_SPEED |
+| Automático | Avance por defecto (moveForward()) | 170 | 66.7% | `DEFAULT_SPEED = 170` definido en `MotorDriver.h` (usado en rutas y comandos por defecto) |
+| Automático | Giro automático 90° (`A` / `D`) | 50 | 19.6% | `TURN_SPEED = 50` definido en `MotorDriver.h`; usado por `startAutoTurn()` |
+| Sistema | MIN_SPEED (umbral aplicado en setLeft/Right) | 80 | 31.4% | Velocidad mínima usada para garantizar que el motor mueva (evita fricción estática). NOTA: las funciones `turnLeft/turnRight` manuales permiten 0..MAX_SPEED y pueden ser más bajas que `MIN_SPEED`. |
+| Sistema | MAX_SPEED | 255 | 100% | Valor máximo PWM |
+
+Notas:
+- Los valores en PWM son enteros 0..255. Los porcentajes son aproximados.
+- La convención en `MotorDriver.cpp` es: LPWM activa el movimiento "adelante"
+	y RPWM activa "atrás" (por eso `moveForward()` activa LPWM y pone RPWM a 0).
+- El lazo PID de velocidad (si está activado) calcula salidas que se mapean a
+	PWM y, actualmente, el firmware aplica una capa de protección que promedia
+	las salidas PWM izquierda/derecha antes de aplicarlas a ambos motores para
+	reducir la deriva en curvas (ver `MotorDriver::updateVelocityControl`).
