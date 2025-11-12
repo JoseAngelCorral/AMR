@@ -17,326 +17,92 @@ Sistema completo de control para robot móvil autónomo basado en Arduino Uno (o
 - **Resolución de encoder**: 1200 pulsos por revolución
 - **Diámetro de rueda**: 16cm
 - **Velocidad máxima**: Variable (0-255 PWM)
-- **Precisión de giro**: ±8° de tolerancia
-
-## 🔌 Conexiones de Hardware
-````markdown
-# 🤖 AMR (Autonomous Mobile Robot) - Sistema de Control Completo
-
-## 📋 Descripción del Proyecto
-
-Sistema completo de control para robot móvil autónomo basado en Arduino Uno con control de motores, odometría y navegación por teclado. El robot incluye encoders rotativos, drivers de motor BTS7960 y capacidades de tracking de posición en tiempo real.
-
-## 🛠️ Hardware Requerido
-
-### Componentes Principales:
-- **Arduino Uno** - Microcontrolador principal
-- **Encoder E386G5** - 400 PPR × 3 = 1200 PPR total
-- **Driver BTS7960** (x2) - Control de motores DC (hasta 43A)
-- **Motores DC** (x2) - Con ruedas de 16cm de diámetro
-- **Fuente de alimentación** - Para motores (12V/24V recomendado)
-
-### Especificaciones:
-- **Resolución de encoder**: 1200 pulsos por revolución
-- **Diámetro de rueda**: 16cm
-- **Velocidad máxima**: Variable (0-255 PWM)
-- **Precisión de giro**: ±8° de tolerancia
-
-## 🔌 Conexiones de Hardware
-
-### Encoders:
-```
-Motor Izquierdo:
-- Encoder A: Pin 13 (Arduino)
-- Encoder B: Pin 3 (INT1 - Interrupción)
-
-Motor Derecho:  
-- Encoder A: Pin 12 (Arduino)
-- Encoder B: Pin 2 (INT0 - Interrupción)
-```
-
-### Motores (BTS7960):
-```
-Motor Izquierdo:
-- RPWM: Pin 10 (PWM Atrás)
-- LPWM: Pin 11 (PWM Adelante)
-
-Motor Derecho:
-- RPWM: Pin 5 (PWM Atrás) 
-- LPWM: Pin 6 (PWM Adelante)
-
-Enables (REN/LEN): Alimentación externa (siempre HIGH)
-```
-
-### Alimentación:
-- **Arduino**: 5V USB o 7-12V jack
-- **Motores**: Fuente externa 12V/24V conectada a BTS7960
-- **Enables**: Conectar VCC de Arduino a REN/LEN de ambos BTS7960
-
-### Sensores Infrarrojos (IR) - Analógicos
-
-Este proyecto soporta un arreglo de 5 sensores IR analógicos conectados a los
-pines A0..A5 del Arduino (configuración usada en el sketch `AMR_Complete.ino`).
-Se asumió que los sensores funcionan a 5V y devuelven un valor analógico en el
-rango 0..1023 donde valores mayores representan detección.
-
-Conexión recomendada:
-- VCC del sensor -> 5V del Arduino
-- GND del sensor -> GND común
-- OUT del sensor -> pin analógico del Arduino
-
-Mapeo por defecto en el firmware:
-- LEFT_SIDE (lateral izquierdo)  -> `A0`
-- FRONT_LEFT (frontal izquierdo) -> `A1`
-- BACK_CENTER (trasero central)  -> `A2`
-- FRONT_RIGHT (frontal derecho)  -> `A4`
-- RIGHT_SIDE (lateral derecho)   -> `A5`
-
-Parámetros y notas:
-- Umbral por defecto: `IR_THRESHOLD = 600` (0..1023). Ajustar tras calibración.
-- Lectura: el sketch toma 3 muestras y promedia para reducir ruido (configurable).
-- En el comando de inspección `I` el sketch imprime tanto el valor bruto como el
-	estado detectado (0/1) por cada sensor. Ejemplo de salida:
-
-```
-IR: L:0(123) FL:1(712) B:0(200) FR:0(189) R:0(145)
-```
-
-Calibración rápida desde Serial Monitor:
-1. Abrir Serial Monitor a 115200 baudios.
-2. Con el sensor apuntando a un área libre de obstáculos, enviar `I` y anotar los
-	 valores "raw" (mínimos).
-3. Colocar un objeto delante del sensor y enviar `I` para obtener los valores
-	 máximos detectados.
-4. Elegir un umbral intermedio entre mínimo y máximo (por ejemplo (min+max)/2)
-	 y actualizar `IR_THRESHOLD` en el código o realizar una calibración automática
-	 si se implementa posteriormente.
-
-Acciones sugeridas en el robot:
-- Evitar avanzar (comando `W`) si cualquiera de los sensores frontales detecta
-	un obstáculo (lógica a añadir en el sketch opcionalmente).
-- Enviar telemetría periódica de IR por `Serial1` si se usa Arduino R4 con WiFi
-	para exponer datos al dashboard (pendiente de implementación).
-
-
-## 🎮 Controles del Sistema
-
-### Comandos de Movimiento:
-- **`W`** - Avanzar hacia adelante
-- **`S`** - Retroceder
-- **`A`** - Girar 90° a la izquierda
-- **`D`** - Girar 90° a la derecha  
-- **`X`** - Parar todos los motores
-
-### Controles manuales en el dashboard (UI)
-- En la interfaz web (dashboard) se dispone de una cruceta (D-pad) táctil con los mismos comandos:
-	- Mantener pulsado `↑ Adelante` emite `W` en modo hold y avanza mientras está pulsado.
-	- Mantener pulsado `↓ Atrás` emite `S` en modo hold y retrocede mientras está pulsado.
-	- Mantener pulsado `← Izq` emite `Q` en modo hold y produce un giro manual en sitio mientras se mantiene pulsado.
-	- Mantener pulsado `Der →` emite `E` en modo hold y gira manual en sitio mientras se mantiene pulsado.
-	- El botón central `⏹ Stop` envía `X`.
-
-Velocidades manuales por defecto implementadas:
-- Giro manual (Q/E): 20% PWM de `MAX_SPEED` (para giros lentos y controlables en sitio).
-- Avance/retroceso manual (W/S): 40% PWM de `MAX_SPEED` (más estable para control táctil).
-
-Nota: los giros automáticos por 90° siguen manteniéndose con `A`/`D` y usan el cálculo por encoders (`startAutoTurn`) — la funcionalidad automática de 90° no cambió.
-
-### Comandos de Información:
-- **`P`** - Mostrar posición actual (x,y,θ)
-- **`R`** - Reset posición a origen (0,0,0°)
-- **`H`** - Mostrar ayuda de comandos
-
-### Comandos de Diagnóstico:
-- **`T`** - Test completo de ambos motores
-- **`M`** - Diagnóstico específico del motor derecho
-
-## 📡 Comunicación Serial
-
-- **Baudios**: 115200
-- **Protocolo**: Comandos de un solo carácter
-- **Respuesta**: Confirmación y estado por Serial Monitor
-
-### Endpoints Web (Dashboard)
-- `GET /` - Página principal (dashboard)
-- `GET /data` - Telemetría en JSON: posición y lecturas IR
-- `GET /routes` - Lista de rutas (JSON)
-- `GET /routes_ui` - Página de UI para selección e inicio de rutas
-- `GET /start_route?route=<i>&dir=ida|retorno&delay=<ms>` - Programar ejecución de ruta
-- `GET /stop_route` - Detener ejecución de ruta
-- `GET /route_status` - Estado de ejecución de ruta (JSON)
-- `GET /confirm_route` - Confirmar inicio programado (inicia inmediatamente si estaba en espera)
-- `GET /cmd?c=<CHAR>` - Enviar comando simple desde la UI (ej: `c=W`)
-
-### Ejemplo de uso:
-```
-> W
-Adelante
-> P  
-(15.2,8.7) 45°
-> A
-Izq 90
-Obj:-45
-OK
-```
-
-## 🧭 Sistema de Odometría
-
-### Características:
-- **Posición inicial**: (0,0) en coordenadas cartesianas
-- **Orientación inicial**: 0° (Norte)
-- **Actualización**: Cada 50ms
-- **Precisión**: Submilimétrica en distancias cortas
-
-### Cálculos:
-- **Distancia por pulso (cm/pulse)**: se calcula como \(\pi \times \text{WHEEL_DIAMETER_CM} / PPR\).
-- Con los valores actuales del proyecto:
-- - Diámetro rueda: 15.50 cm
-- - Pulsos por revolución (PPR) por defecto calibrado: 3418
-- - Circunferencia = π × 15.50 ≈ 48.6947 cm
-- - Distancia por pulso ≈ 48.6947 / 3418 ≈ 0.014245 cm/pulso (≈ 0.14245 mm/pulso)
- - **Wheelbase**: Distancia entre ruedas (configurable)
- - **Algoritmo**: Odometría diferencial con integración de Euler
-
-### Calibración y métricas por tic (pulsos)
-
-El sketch incluye utilidades y pruebas para calibrar los encoders. Resumen de comportamiento y métricas:
-
-- Valor PPR por defecto (definido en `Encoder.h`) se actualizó tras la prueba `V` ("Avanzar 1 vuelta") a: **3418 PPR**.
-- `Encoder::init()` imprime en Serial los valores calculados en el arranque: `cm/pulse`, `deg/pulse(single)` y `deg/pulse(pair)`.
-- Fórmulas:
-	- cm por tic = circunferencia / PPR = (π × WHEEL_DIAMETER_CM) / PPR
-	- grados por tic (rueda única, la otra parada):
-		deg_per_tick_single = (cm_por_tic / WHEEL_BASE_CM) × (180/π)
-	- grados por tic (giro en sitio, rueda A adelante y B atrás):
-		deg_per_tick_pair = 2 × deg_per_tick_single
-
-Con los valores actuales (ejemplo numérico):
-- cm/tick ≈ 0.014245 cm/tick (≈ 0.14245 mm/tick)
-- deg/tick (single) ≈ 0.01285° por tick
-- deg/tick (pair) ≈ 0.02569° por tick
-
-Notas prácticas:
-- La odometría (`Odometry::update()`) usa `Encoder::pulsesToCentimeters()` para convertir los pulsos a cm y calcula:
-	- deltaDistance = (deltaLeftCm + deltaRightCm) / 2
-	- deltaTheta (rad) = (deltaRightCm - deltaLeftCm) / WHEEL_BASE_CM
-	por lo que cualquier cambio en PPR afecta directamente a la precisión de la odometría.
-- El comando de prueba `V` calcula el PPR medido en tiempo de ejecución y llama a `encoders.setPulsesPerRevolution(measured)` — esto actualiza `Encoder::pulsesPerRevolution` inmediatamente sin necesidad de recompilar.
-- Recomendación: ejecutar la prueba `V` varias veces y promediar los resultados para obtener un PPR más estable antes de fijarlo.
-- Persistencia: si quieres que el PPR calibrado se mantenga tras resets, podemos guardar el valor en EEPROM y cargarlo en `setup()` — puedo añadir esa funcionalidad si lo deseas.
-
-## 📁 Estructura del Proyecto
-
-```
-AMR/
-├── arduino/src/AMR_Complete/
-│   ├── AMR_Complete.ino          # Programa principal
-│   ├── MotorDriver.h/.cpp        # Control de motores BTS7960  
-│   ├── Encoder.h/.cpp            # Manejo de encoders E386G5
-│   └── Odometry.h/.cpp           # Sistema de odometría
-├── docs/                         # Documentación técnica
-└── README.md                     # Esta documentación
-```
-
-## 🚀 Instalación y Uso
-
-### 1. Configuración del Arduino IDE:
-```bash
-1. Abrir Arduino IDE
-2. Seleccionar placa: Arduino Uno
-3. Seleccionar puerto COM correcto
-4. Abrir archivo: AMR_Complete.ino
-```
-
-### 2. Compilación y Carga:
-```bash
-1. Verificar código (Ctrl+R)
-2. Comprobar memoria: <90% RAM, <40% Flash
-3. Subir a Arduino (Ctrl+U)
-```
-
-### 3. Operación:
-```bash
-1. Abrir Serial Monitor (115200 baudios)
-2. Enviar comandos individuales (W/A/S/D/X/P/R/T/I/K/H) o usar el dashboard web
-3. Observar respuestas del sistema
-```
-
-## 🔧 Resolución de Problemas
-
-### Problema: Motores giran en dirección incorrecta
-**Solución**: Intercambiar conexiones RPWM/LPWM en el BTS7960
-
-### Problema: Encoders no cuentan
-**Solución**: 
-- Verificar conexiones en pines 2 y 3 (interrupciones)
-- Comprobar alimentación de encoders (5V)
-- Usar comando `P` para verificar conteo
-
-### Problema: Error de memoria al compilar
-**Solución**: Código ya optimizado para Arduino Uno (uso <90% RAM)
-
-### Problema: Motor no responde
-**Solución**:
-- Usar comando `M` para diagnóstico específico
-- Verificar alimentación externa de motores
-- Comprobar conexiones REN/LEN (enables)
-
-## 📊 Especificaciones Técnicas
-
-### Rendimiento:
-- **Velocidad lineal máxima**: ~50 cm/s (aprox)
-- **Velocidad angular**: ~45°/s en giros
-- **Precisión de posición**: ±2cm en trayectos cortos
-- **Precisión angular**: ±8° en giros automáticos
-
-### Memoria (Arduino Uno):
-- **Flash**: ~12KB/32KB (37%)
-- **RAM**: ~1.8KB/2KB (90%) - Optimizado
-- **EEPROM**: No utilizada
-
-### Comunicación:
-- **Serial**: 115200 baud, 8N1
-- **Latencia**: <50ms respuesta promedio
-- **Buffer**: Limpieza automática de comandos
-
-## 🎯 Características Implementadas
-
-- ✅ Control bidireccional de motores
-- ✅ Odometría diferencial en tiempo real  
-- ✅ Giros automáticos de 90° con feedback
-- ✅ Sistema de coordenadas cartesianas
-- ✅ Diagnóstico completo de hardware
-- ✅ Interfaz serial interactiva
-- ✅ Gestión de memoria optimizada
-- ✅ Manejo de interrupciones para encoders
- - ✅ Interfaz web/Dashboard con D-pad táctil
- - ✅ Hold-to-turn y hold-to-move en la UI (W/S/Q/E)
- - ✅ Ajustes manuales: giro 20% PWM, avance/retroceso 40% PWM
- - ✅ Endpoints REST simples para rutas y telemetría
- - ✅ Pulsos por revolución (PPR) calibrado por prueba 'V' (Avanzar 1 vuelta): DEFAULT_PULSES_PER_REVOLUTION = 3418
-
-## 🔮 Desarrollo Futuro
-
--### Próximas características:
-- [ ] Control remoto WiFi/Bluetooth
-- [ ] Navegación autónoma con sensores
-- [ ] Mapeo y localización (SLAM)
-- [ ] Interface web de control
-- [ ] Integración con sensores adicionales (LiDAR, cámara)
-
-## 📞 Contacto y Soporte
-
-Para reportar problemas, sugerencias o contribuciones:
-- **Repositorio**: https://github.com/JoseAngelCorral/AMR
-- **Documentación técnica**: Ver carpeta `docs/`
-
-## 📄 Licencia
-
-Este proyecto está bajo licencia MIT. Ver archivo LICENSE para más detalles.
-
----
-
-**Última actualización**: Octubre 2025  
-**Versión del firmware**: v1.0  
-**Estado**: Funcional y operativo ✅
+## 🔌 Conexiones de Hardware y funcionamiento
+
+Esta sección describe las conexiones físicas (pines) usadas por el firmware y el
+propósito de cada bloque hardware. Usa estas indicaciones para cablear el robot
+de forma segura y comprobar que las señales coinciden con el código fuente.
+
+IMPORTANTE (alimentación y seguridad):
+- Los BTS7960 controlan la alimentación de los motores y deben alimentarse desde
+	una fuente externa (12V o 24V según tus motores). Nunca alimentes los motores
+	desde la salida 5V del Arduino.
+- Conectar las masas (GND) del Arduino y de la fuente de motor: GND común.
+- REN / LEN (enables) de cada BTS7960 deben estar a nivel HIGH (VCC) para permitir
+	el driver; en este diseño están alimentados externamente y no se manejan desde
+	Arduino.
+
+Resumen de pines (firmware actual)
+- Encoders
+	- Encoder izquierdo:  A = `PIN 8`   | B = `PIN 2`  (INT0)
+	- Encoder derecho :  A = `PIN 9`   | B = `PIN 3`  (INT1)
+	- Nota: en Arduino Uno los pines 2 y 3 son las interrupciones externas usadas
+		por las ISRs del encoder. Los pines A (8/9) son señales de fase.
+
+- Drivers de motor (BTS7960)
+	- Motor izquierdo (BTS7960 #1):
+		- RPWM = `PIN 10`  (PWM - usado para sentido "atrás")
+		- LPWM = `PIN 11`  (PWM - usado para sentido "adelante")
+	- Motor derecho (BTS7960 #2):
+		- RPWM = `PIN 5`   (PWM - usado para sentido "atrás")
+		- LPWM = `PIN 6`   (PWM - usado para sentido "adelante")
+	- REN / LEN (enables) → deben estar a VCC/5V para habilitar los drivers.
+	- En el código `MotorDriver.cpp` se documenta y usa la convención de que
+		LPWM activa el movimiento "adelante" y RPWM activa "atrás".
+
+- Sensores IR analógicos (arreglo):
+	- LEFT_SIDE  -> `A0`
+	- FRONT_LEFT -> `A1`
+	- BACK_CENTER-> `A2`
+	- FRONT_RIGHT-> `A4`
+	- RIGHT_SIDE -> `A5`
+	- Conectar VCC -> `5V`, GND -> `GND`, OUT -> pin analógico correspondiente.
+
+- Otros periféricos / notas:
+	- WiFi (UNO R4 WiFi): el sketch usa la librería `WiFiS3` y arranca como punto
+		de acceso con SSID `AMR_Robot_AP`. Si usas otra placa o core, adapta según
+		la plataforma.
+
+Funcionamiento y propósito de cada conexión
+- Encoders:
+	- Proveen conteo de pulsos por cada paso de la rueda. El firmware usa los
+		pulsos (left/right) para odometría y control en lazo cerrado (PID).
+	- Las señales B de cada encoder van a pines 2 y 3 para generar interrupciones
+		y contar pulsos con mínima latencia.
+	- `Encoder::pulsesToCentimeters()` convierte pulsos a distancia usando la
+		circunferencia de rueda y la constante `pulsesPerRevolution` (por defecto
+		calibrada a 3418 PPR en `Encoder.h`).
+
+- Drivers BTS7960 y motores:
+	- BTS7960 usa dos entradas PWM por motor (RPWM/LPWM). Activando una u otra
+		se define el sentido; las señales PWM modulan la potencia.
+	- El firmware mantiene los enables (REN/LEN) externamente en HIGH. Si tu
+		placa requiere controlar enables desde Arduino, agrégalo y actualiza
+		`MotorDriver::init()` para configurar el pin.
+	- En `MotorDriver.cpp` las funciones `moveForward`, `moveBackward`,
+		`turnLeft` y `turnRight` aplican combinaciones de RPWM/LPWM según el sentido
+		deseado. Por ejemplo, para avanzar se aplica PWM en LPWM y se pone RPWM=0.
+
+- Sensores IR:
+	- Lectura analógica con promedio de 3 muestras (configurable). Un umbral
+		determina detección (por defecto `IR_THRESHOLD` en el sketch).
+	- Se usan para detección de obstáculos y podrían integrarse en la lógica de
+		seguridad (por ejemplo impedir avanzar si un sensor frontal detecta algo).
+
+Consejos prácticos de cableado y pruebas
+- Antes de conectar los motores, prueba la lógica con el test de motores:
+	- Conecta sólo el Arduino al PC y deja los BTS7960 sin alimentar; ejecuta el
+		comando `T` (test) para comprobar que la lógica PWM funciona (salidas PWM
+		cambiarán, pero sin alimentación externa los motores no girarán).
+- Conecta la fuente de motor y coloca GND común con Arduino. Ejecuta `T` y
+	observa la respuesta de los motores (con cautela).
+- Para comprobar encoders:
+	- Abre el Serial Monitor a 115200 baudios.
+	- Mueve manualmente una rueda y comprueba que los contadores cambian (usa el
+		comando `P` o las salidas `encoders` impresas en `setup()`/diagnóstico).
+- Si un motor gira en sentido opuesto al esperado, intercambia las salidas
+	RPWM/LPWM en el cableado del BTS7960 (o modifica la lógica en
+	`MotorDriver.cpp`).
+
+¿Quieres que añada un diagrama de conexión ASCII o una imagen SVG en `docs/`?
+Puedo generar un diagrama con las conexiones anteriores y añadirlo al repo.
