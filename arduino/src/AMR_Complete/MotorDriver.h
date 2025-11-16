@@ -17,10 +17,13 @@
 // REN y LEN: Alimentación externa (siempre HIGH)
 
 // Velocidades para BTS7960 (más potente que L298N)
-// Valores ajustados: ver README/AMR_Complete para porcentajes
-#define DEFAULT_SPEED 170    // Velocidad por defecto (0-255)
-#define TURN_SPEED 50       // Velocidad para giros
-#define MAX_SPEED 255        // Velocidad máxima
+// Ajustadas para que las velocidades automáticas coincidan con las manuales
+// Usamos porcentajes del valor máximo (MAX_SPEED = 255):
+// - Avance/retroceso manual/automático = 40% -> 255 * 0.40 ≈ 102
+// - Giro manual/automático = 20% -> 255 * 0.20 ≈ 51
+#define MAX_SPEED 255        // Velocidad máxima (PWM 0..255)
+#define DEFAULT_SPEED 102    // Velocidad por defecto para avance (≈40% de MAX)
+#define TURN_SPEED 51        // Velocidad para giros automáticos (≈20% de MAX)
 #define MIN_SPEED 80         // Velocidad mínima para superar fricción
 
 class MotorDriver {

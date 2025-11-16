@@ -156,8 +156,8 @@ basados en constantes definidas en `MotorDriver.h` y uso en
 |---|---:|---:|---:|---|
 | Manual | Adelante / Atrás (hold - `W` / `S`) | 102 | 40% | Implementado como (int)(MAX_SPEED * 0.40f) |
 | Manual | Giro en sitio (hold - `Q` / `E`) | 51 | 20% | Implementado como (int)(MAX_SPEED * 0.20f); `turnLeft/turnRight` permiten < MIN_SPEED |
-| Automático | Avance por defecto (moveForward()) | 170 | 66.7% | `DEFAULT_SPEED = 170` definido en `MotorDriver.h` (usado en rutas y comandos por defecto) |
-| Automático | Giro automático 90° (`A` / `D`) | 50 | 19.6% | `TURN_SPEED = 50` definido en `MotorDriver.h`; usado por `startAutoTurn()` |
+| Automático | Avance por defecto (moveForward()) | 102 | 40% | `DEFAULT_SPEED = 102` definido en `MotorDriver.h` (igual a velocidad manual hold `W`/`S`) |
+| Automático | Giro automático 90° (`A` / `D`) | 51 | 20% | `TURN_SPEED = 51` definido en `MotorDriver.h`; igual a giro manual hold `Q`/`E` |
 | Sistema | MIN_SPEED (umbral aplicado en setLeft/Right) | 80 | 31.4% | Velocidad mínima usada para garantizar que el motor mueva (evita fricción estática). NOTA: las funciones `turnLeft/turnRight` manuales permiten 0..MAX_SPEED y pueden ser más bajas que `MIN_SPEED`. |
 | Sistema | MAX_SPEED | 255 | 100% | Valor máximo PWM |
 
