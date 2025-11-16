@@ -7,13 +7,13 @@
 
 // Pines para control de motores BTS7960 - Configuración real
 // Motor Izquierdo (BTS7960 #1)
-#define MOTOR_LEFT_RPWM 10   // PWM Adelante motor izquierdo
-#define MOTOR_LEFT_LPWM 11   // PWM Atrás motor izquierdo  
+#define MOTOR_LEFT_RPWM 5   // PWM Adelante motor izquierdo
+#define MOTOR_LEFT_LPWM 6   // PWM Atrás motor izquierdo  
 // REN y LEN: Alimentación externa (siempre HIGH)
 
 // Motor Derecho (BTS7960 #2)  
-#define MOTOR_RIGHT_RPWM 5   // PWM Adelante motor derecho
-#define MOTOR_RIGHT_LPWM 6   // PWM Atrás motor derecho
+#define MOTOR_RIGHT_RPWM 10   // PWM Adelante motor derecho
+#define MOTOR_RIGHT_LPWM 11   // PWM Atrás motor derecho
 // REN y LEN: Alimentación externa (siempre HIGH)
 
 // Velocidades para BTS7960 (más potente que L298N)
