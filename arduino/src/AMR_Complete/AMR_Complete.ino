@@ -660,6 +660,11 @@ struct IRSampler {
 
 IRSampler* irSampler = nullptr;
 
+// Inspección continua (comando 'I')
+bool inspectionActive = false;
+unsigned long inspectionLastMillis = 0;
+const unsigned long INSPECTION_INTERVAL_MS = 250; // intervalo para inspección continua
+
 // Simple circular log buffer to capture important messages (also mirrored to Serial)
 const int LOG_LINES = 64;
 String logBuffer[LOG_LINES];
@@ -944,6 +949,41 @@ void loop() {
         lastTickPrintMillis = millis();
     }
     
+    // Inspección continua (comando 'I') - ejecuta las mismas acciones que la
+    // inspección rápida pero de forma periódica hasta que se envíe 'X'.
+    if (inspectionActive && (millis() - inspectionLastMillis >= INSPECTION_INTERVAL_MS)) {
+        inspectionLastMillis = millis();
+        Serial.println(F("[I] Inspeccion continua: estados de pines de encoder"));
+        Serial.print(F("L_A:")); Serial.print(ENCODER_LEFT_A_PIN);
+        Serial.print(F(" val:")); Serial.print(digitalRead(ENCODER_LEFT_A_PIN));
+        Serial.print(F(" L_B:")); Serial.print(ENCODER_LEFT_B_PIN);
+        Serial.print(F(" val:")); Serial.print(digitalRead(ENCODER_LEFT_B_PIN));
+        Serial.print(F(" R_A:")); Serial.print(ENCODER_RIGHT_A_PIN);
+        Serial.print(F(" val:")); Serial.print(digitalRead(ENCODER_RIGHT_A_PIN));
+        Serial.print(F(" R_B:")); Serial.print(ENCODER_RIGHT_B_PIN);
+        Serial.print(F(" val:")); Serial.println(digitalRead(ENCODER_RIGHT_B_PIN));
+        Serial.print(F("int L_B:")); Serial.print(digitalPinToInterrupt(ENCODER_LEFT_B_PIN));
+        Serial.print(F(" int R_B:")); Serial.println(digitalPinToInterrupt(ENCODER_RIGHT_B_PIN));
+        Serial.print(F("Pulses L:")); Serial.print(encoders.readLeft());
+        Serial.print(F(" R:")); Serial.println(encoders.readRight());
+
+        // Leer y mostrar sensores IR (raw + detectado) y mostrar distancia estimada
+        IRSensors ir = readIRSensors();
+        sendIRTelemetry(ir);
+        unsigned long tTotal = 0;
+        float dL = distanciaSamples(IR_LEFT_SIDE_PIN, IR_NUM_SAMPLES, &tTotal);
+        float dFL = distanciaSamples(IR_FRONT_LEFT_PIN, IR_NUM_SAMPLES, &tTotal);
+        float dB = distanciaSamples(IR_BACK_CENTER_PIN, IR_NUM_SAMPLES, &tTotal);
+        float dFR = distanciaSamples(IR_FRONT_RIGHT_PIN, IR_NUM_SAMPLES, &tTotal);
+        float dR = distanciaSamples(IR_RIGHT_SIDE_PIN, IR_NUM_SAMPLES, &tTotal);
+        Serial.print(F("Dist(cm) L:")); Serial.print(dL,1);
+        Serial.print(F(" FL:")); Serial.print(dFL,1);
+        Serial.print(F(" B:")); Serial.print(dB,1);
+        Serial.print(F(" FR:")); Serial.print(dFR,1);
+        Serial.print(F(" R:")); Serial.print(dR,1);
+        Serial.print(F("  LeerTiempo(ms):")); Serial.println(tTotal);
+    }
+
     delay(5); // Pequeña pausa para estabilidad
 
     // --- PID velocity update (called regularly) ---
@@ -1135,6 +1175,11 @@ void processCommand(char cmd) {
             turningInProgress = false;
             // Detener impresión de tics si estaba activa
             printTicksWhileMoving = false;
+            // Detener inspección continua si está activa
+            if (inspectionActive) {
+                inspectionActive = false;
+                Serial.println(F("Inspeccion continua detenida."));
+            }
             // Si hay muestreo IR en curso, detenerlo y liberar recursos
             if (irSampler) {
                 Serial.println(F("Deteniendo muestreo IR (K)..."));
@@ -1189,37 +1234,13 @@ void processCommand(char cmd) {
         // 'M' (diagnóstico motor derecho) removed - mantiene solo el test completo 'T'
 
         case 'I':
-            // Inspección rápida de pines de encoder y estados
-            Serial.println(F("Inspeccion: estados de pines de encoder"));
-            Serial.print(F("L_A:")); Serial.print(ENCODER_LEFT_A_PIN);
-            Serial.print(F(" val:")); Serial.print(digitalRead(ENCODER_LEFT_A_PIN));
-            Serial.print(F(" L_B:")); Serial.print(ENCODER_LEFT_B_PIN);
-            Serial.print(F(" val:")); Serial.print(digitalRead(ENCODER_LEFT_B_PIN));
-            Serial.print(F(" R_A:")); Serial.print(ENCODER_RIGHT_A_PIN);
-            Serial.print(F(" val:")); Serial.print(digitalRead(ENCODER_RIGHT_A_PIN));
-            Serial.print(F(" R_B:")); Serial.print(ENCODER_RIGHT_B_PIN);
-            Serial.print(F(" val:")); Serial.println(digitalRead(ENCODER_RIGHT_B_PIN));
-            Serial.print(F("int L_B:")); Serial.print(digitalPinToInterrupt(ENCODER_LEFT_B_PIN));
-            Serial.print(F(" int R_B:")); Serial.println(digitalPinToInterrupt(ENCODER_RIGHT_B_PIN));
-            Serial.print(F("Pulses L:")); Serial.print(encoders.readLeft());
-            Serial.print(F(" R:")); Serial.println(encoders.readRight());
-            // Leer y mostrar sensores IR (raw + detectado) y mostrar distancia estimada
-            {
-                IRSensors ir = readIRSensors();
-                sendIRTelemetry(ir);
-                // Medir distancia usando N muestras y reportar tiempo de lectura
-                unsigned long tTotal = 0;
-                float dL = distanciaSamples(IR_LEFT_SIDE_PIN, IR_NUM_SAMPLES, &tTotal);
-                float dFL = distanciaSamples(IR_FRONT_LEFT_PIN, IR_NUM_SAMPLES, &tTotal);
-                float dB = distanciaSamples(IR_BACK_CENTER_PIN, IR_NUM_SAMPLES, &tTotal);
-                float dFR = distanciaSamples(IR_FRONT_RIGHT_PIN, IR_NUM_SAMPLES, &tTotal);
-                float dR = distanciaSamples(IR_RIGHT_SIDE_PIN, IR_NUM_SAMPLES, &tTotal);
-                Serial.print(F("Dist(cm) L:")); Serial.print(dL,1);
-                Serial.print(F(" FL:")); Serial.print(dFL,1);
-                Serial.print(F(" B:")); Serial.print(dB,1);
-                Serial.print(F(" FR:")); Serial.print(dFR,1);
-                Serial.print(F(" R:")); Serial.print(dR,1);
-                Serial.print(F("  LeerTiempo(ms):")); Serial.println(tTotal);
+            // Start continuous inspection mode: will run until 'X' is sent
+            if (!inspectionActive) {
+                inspectionActive = true;
+                inspectionLastMillis = 0;
+                Serial.println(F("Inspeccion continua iniciada. Enviar 'X' para detener."));
+            } else {
+                Serial.println(F("Inspeccion ya en ejecución."));
             }
             break;
 
