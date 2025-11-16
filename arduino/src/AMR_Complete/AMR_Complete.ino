@@ -433,26 +433,43 @@ const char dashboardHTML[] PROGMEM = R"rawliteral(
         const bottomLabelArea = 18; // reserve space for sensor labels under bars
         const barAreaW = w - padding*2;
         const barWidth = (barAreaW - gap*(values.length-1)) / values.length;
-    const maxVal = 255; // ADC range is 0-255 on this board/config
+        // Display scale in centimeters (user requested max 100 cm for margin)
+        const maxValCm = 100.0;
         // adaptive font sizes
         const valFontSize = Math.max(10, Math.round(h * 0.08));
         const nameFontSize = Math.max(10, Math.round(h * 0.06));
         ctx.textAlign = 'center';
         for (let i = 0; i < values.length; i++) {
-            const v = values[i];
+            const raw = Number(values[i]);
             const maxBarHeight = h - padding - bottomLabelArea;
-            const barH = Math.max(2, (v / maxVal) * maxBarHeight);
+
+            // Convert ADC/raw value to centimeters using the calibrated formula
+            // distancia_cm = 17569.7 * adc^-1.2062
+            let dist = 0.0;
+            if (raw <= 0) {
+                dist = maxValCm; // if invalid reading, show as far
+            } else {
+                dist = 17569.7 * Math.pow(raw, -1.2062);
+            }
+            if (!isFinite(dist)) dist = maxValCm;
+            if (dist < 2.0) dist = 2.0;
+            if (dist > maxValCm) dist = maxValCm;
+
+            // Height proportional to distance (0..maxValCm mapped to 0..maxBarHeight)
+            const barH = Math.max(2, (dist / maxValCm) * maxBarHeight);
             const x = padding + i * (barWidth + gap);
             const y = h - bottomLabelArea - barH;
-            ctx.fillStyle = v > (maxVal * 0.6) ? 'red' : 'lime';
+
+            // color: red if very close (e.g., < 20 cm), otherwise lime
+            ctx.fillStyle = dist < 20.0 ? 'red' : 'lime';
             ctx.fillRect(x, y, barWidth, barH);
 
-            // draw numeric value above the bar (or inside if too small)
+            // draw numeric value above the bar (distance in cm with 1 decimal)
             ctx.fillStyle = '#fff';
             ctx.font = valFontSize + 'px Arial';
             const valueX = x + barWidth / 2;
             const valueY = Math.max(12, y - 6);
-            ctx.fillText(String(v), valueX, valueY);
+            ctx.fillText(String(dist.toFixed(1)) + ' cm', valueX, valueY);
 
             // draw sensor short name centered below the bar
             ctx.fillStyle = '#eee';
@@ -519,6 +536,15 @@ struct RouteExecution {
     bool waitingForReturnConfirm = false; // waiting confirmation after finishing ida
     bool returnModeActive = false; // true when executing return leg
     bool postFinishTurn = false; // indicates we've started the final 180° turn
+    // Obstacle avoidance state
+    bool obstacleActive = false; // flag indicating avoidance in progress
+    int obstacleSide = 0; // +1 = left, -1 = right (chosen side to go around)
+    int obstacleState = 0; // 0=idle,1=TURN,2=FORWARD,3=TURNBACK,4=CROSS_FORWARD,5=DONE
+    long obstacleMoveStartLeft = 0;
+    long obstacleMoveStartRight = 0;
+    long obstacleMoveTargetPulses = 0;
+    long obstacleMoveMaxPulses = 0; // safety cap if sensor never clears
+    int obstacleProbePin = -1; // pin to sample for clearance (opposite sensor)
     // movement bookkeeping
     long moveStartLeft = 0;
     long moveStartRight = 0;
@@ -724,8 +750,13 @@ const int IR_FRONT_RIGHT_PIN = A4; // Frontal derecho
 const int IR_RIGHT_SIDE_PIN  = A5; // Lateral derecho
 
 // Parámetros de lectura
-const int IR_NUM_SAMPLES = 3;      // número de lecturas para promediar
+const int IR_NUM_SAMPLES = 6;      // número de lecturas para promediar
 int IR_THRESHOLD = 150;            // umbral por defecto (0-255). Ajustar por calibración
+// Obstacle avoidance parameters
+const float OBSTACLE_THRESHOLD_CM = 30.0f; // if front distance below this, consider obstacle
+const float AVOID_STEP_CM = 30.0f; // how far to advance when circumventing (per step)
+const float AVOID_CLEAR_MARGIN_CM = 8.0f; // extra margin to consider object cleared
+const float AVOID_MAX_STEP_CM = 200.0f; // maximum allowed advance during avoidance (safety)
 
 // Estructura para devolver lecturas
 struct IRSensors {
@@ -801,7 +832,7 @@ float distanciaSamples(int pin, int n, unsigned long *outTimeMs = NULL) {
     for (int i = 0; i < n; ++i) {
         suma += analogRead(pin);
         // pequeña espera entre muestras para estabilizar si se desea
-        delay(2);
+        delay(5);
     }
     float adc = (float)suma / (float)n;
     float dist = 17569.7f * powf(adc, -1.2062f);
@@ -923,15 +954,90 @@ void loop() {
                 }
             }
         } else if (routeExec.state == ROUTE_MOVING) {
-            long dl = labs(encoders.readLeft() - routeExec.moveStartLeft);
-            long dr = labs(encoders.readRight() - routeExec.moveStartRight);
-            long maxm = (dl > dr) ? dl : dr;
-            if (maxm >= routeExec.moveTargetPulses) {
+            // First, check for obstacles using IR sensors (sampled in cm)
+            float dFL = distanciaSamples(IR_FRONT_LEFT_PIN, 3, NULL);
+            float dFR = distanciaSamples(IR_FRONT_RIGHT_PIN, 3, NULL);
+            float frontMin = min(dFL, dFR);
+            if (!routeExec.obstacleActive && frontMin <= OBSTACLE_THRESHOLD_CM) {
+                // Trigger avoidance: choose side with greater clearance using side sensors
+                float dL = distanciaSamples(IR_LEFT_SIDE_PIN, 3, NULL);
+                float dR = distanciaSamples(IR_RIGHT_SIDE_PIN, 3, NULL);
+                routeExec.obstacleSide = (dL > dR) ? +1 : -1; // prefer left if more clearance
+                routeExec.obstacleActive = true;
+                routeExec.obstacleState = 1; // TURN
+                // stop current motion and initiate a 90deg turn toward chosen side
                 motors.stop();
-                routeExec.currentPoint++;
-                // small pause before next waypoint
-                delay(80);
-                beginNextWaypoint();
+                delay(30);
+                // choose probe pin: sensor opposite to the turn (as requested)
+                routeExec.obstacleProbePin = (routeExec.obstacleSide == +1) ? IR_RIGHT_SIDE_PIN : IR_LEFT_SIDE_PIN;
+                // compute a safety cap in pulses for the sensor-based forward (AVOID_MAX_STEP_CM)
+                {
+                    float pulsesF = (AVOID_MAX_STEP_CM / (float)WHEEL_CIRCUMFERENCE_CM) * (float)encoders.getPulsesPerRevolution();
+                    routeExec.obstacleMoveMaxPulses = (long)(pulsesF + 0.5f);
+                }
+                startAutoTurn(routeExec.obstacleSide * 90.0f);
+                Serial.print(F("Obstacle detected. side=")); Serial.print(routeExec.obstacleSide);
+                Serial.print(F(" frontMin=")); Serial.println(frontMin);
+            } else if (routeExec.obstacleActive) {
+                // Obstacle avoidance in progress; handle via obstacle state machine below
+                // The actual transitions are handled in handleAutoTurn() and this loop
+                // by monitoring encoders when moving forward for avoidance steps.
+                if (routeExec.obstacleState == 2) {
+                        // moving forward step: sensor-driven completion (probe opposite sensor)
+                        // read probe sensor distance
+                        float probeDist = distanciaSamples(routeExec.obstacleProbePin, 3, NULL);
+                        long dl = labs(encoders.readLeft() - routeExec.obstacleMoveStartLeft);
+                        long dr = labs(encoders.readRight() - routeExec.obstacleMoveStartRight);
+                        long maxm = (dl > dr) ? dl : dr;
+                        // If probe reports clearance beyond threshold+margin, or we hit safety cap, stop
+                        if (probeDist >= (OBSTACLE_THRESHOLD_CM + AVOID_CLEAR_MARGIN_CM) || maxm >= routeExec.obstacleMoveMaxPulses) {
+                            motors.stop();
+                            delay(30);
+                            // after forward step, initiate turn back (opposite 90°)
+                            routeExec.obstacleState = 3; // TURNBACK
+                            startAutoTurn(-routeExec.obstacleSide * 90.0f);
+                        }
+                    } else if (routeExec.obstacleState == 4) {
+                    // crossing forward step: similar completion check
+                    long dl = labs(encoders.readLeft() - routeExec.obstacleMoveStartLeft);
+                    long dr = labs(encoders.readRight() - routeExec.obstacleMoveStartRight);
+                    long maxm = (dl > dr) ? dl : dr;
+                    if (maxm >= routeExec.obstacleMoveTargetPulses) {
+                        motors.stop();
+                        delay(30);
+                        // finish avoidance
+                        routeExec.obstacleState = 5; // DONE
+                        routeExec.obstacleActive = false;
+                        Serial.println(F("Obstacle avoidance finished."));
+                        // recompute movement towards same waypoint from new pose
+                        float dx = routeExec.targetX - odometry.getX();
+                        float dy = routeExec.targetY - odometry.getY();
+                        float dist = sqrtf(dx*dx + dy*dy);
+                        float pulsesF = (dist / (float)WHEEL_CIRCUMFERENCE_CM) * (float)encoders.getPulsesPerRevolution();
+                        routeExec.moveTargetPulses = (long)(pulsesF + 0.5f);
+                        routeExec.moveStartLeft = encoders.readLeft();
+                        routeExec.moveStartRight = encoders.readRight();
+                        if (routeExec.moveTargetPulses <= 0) {
+                            routeExec.currentPoint++;
+                            beginNextWaypoint();
+                        } else {
+                            motors.moveForward();
+                            routeExec.state = ROUTE_MOVING;
+                        }
+                    }
+                }
+            } else {
+                // Normal movement completion check (no obstacle active)
+                long dl = labs(encoders.readLeft() - routeExec.moveStartLeft);
+                long dr = labs(encoders.readRight() - routeExec.moveStartRight);
+                long maxm = (dl > dr) ? dl : dr;
+                if (maxm >= routeExec.moveTargetPulses) {
+                    motors.stop();
+                    routeExec.currentPoint++;
+                    // small pause before next waypoint
+                    delay(80);
+                    beginNextWaypoint();
+                }
             }
         }
     }
@@ -1212,14 +1318,6 @@ void processCommand(char cmd) {
             }
             break;
 
-        case 'U':
-            // Disable velocity PID
-            motors.enableVelocityControl(false);
-            Serial.println(F("PID disabled"));
-            break;
-            
-        // 'M' (diagnóstico motor derecho) removed - mantiene solo el test completo 'T'
-
         case 'I':
             // Start continuous inspection mode: will run until 'X' is sent
             if (!inspectionActive) {
@@ -1228,21 +1326,6 @@ void processCommand(char cmd) {
                 Serial.println(F("Inspeccion continua iniciada. Enviar 'X' para detener."));
             } else {
                 Serial.println(F("Inspeccion ya en ejecución."));
-            }
-            break;
-
-        case 'K':
-            // Iniciar muestreo continuo de sensores IR (no bloqueante)
-            if (irSampler == nullptr) {
-                irSampler = new IRSampler();
-                irSampler->samplesPerRead = IR_NUM_SAMPLES; // usar el ajuste global
-                irSampler->intervalMs = 200; // intervalo por defecto (ms)
-                irSampler->lastMillis = 0;
-                irSampler->running = true;
-                Serial.print(F("Muestreo IR continuo iniciado. Intervalo ms: "));
-                Serial.println(irSampler->intervalMs);
-            } else {
-                Serial.println(F("Muestreo IR ya en ejecución."));
             }
             break;
             
@@ -1341,6 +1424,32 @@ void handleAutoTurn() {
 
         return;
     }
+        // If an obstacle avoidance sequence was waiting for this turn to finish,
+        // advance the obstacle state machine: after the initial TURN we should
+        // start the forward step; after the TURNBACK we should start the crossing step.
+        if (routeExec.obstacleActive) {
+            if (routeExec.obstacleState == 1) {
+                // Completed initial 90° turn; start forward step
+                routeExec.obstacleState = 2; // FORWARD
+                // compute pulses for AVOID_STEP_CM
+                float pulsesF = (AVOID_STEP_CM / (float)WHEEL_CIRCUMFERENCE_CM) * (float)encoders.getPulsesPerRevolution();
+                routeExec.obstacleMoveTargetPulses = (long)(pulsesF + 0.5f);
+                routeExec.obstacleMoveStartLeft = encoders.readLeft();
+                routeExec.obstacleMoveStartRight = encoders.readRight();
+                motors.moveForward();
+                Serial.print(F("Avoidance: forward step pulses:")); Serial.println(routeExec.obstacleMoveTargetPulses);
+            } else if (routeExec.obstacleState == 3) {
+                // Completed turn back toward original heading; start crossing forward step
+                routeExec.obstacleState = 4; // CROSS_FORWARD
+                float pulsesF = (AVOID_STEP_CM / (float)WHEEL_CIRCUMFERENCE_CM) * (float)encoders.getPulsesPerRevolution();
+                routeExec.obstacleMoveTargetPulses = (long)(pulsesF + 0.5f);
+                routeExec.obstacleMoveStartLeft = encoders.readLeft();
+                routeExec.obstacleMoveStartRight = encoders.readRight();
+                motors.moveForward();
+                Serial.print(F("Avoidance: cross forward pulses:")); Serial.println(routeExec.obstacleMoveTargetPulses);
+            }
+            return;
+        }
 
     // Verificar timeout
     if (millis() - turnStartTime > MAX_TURN_TIME) {
