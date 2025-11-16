@@ -954,14 +954,20 @@ void loop() {
     if (inspectionActive && (millis() - inspectionLastMillis >= INSPECTION_INTERVAL_MS)) {
         inspectionLastMillis = millis();
         // Single-line output: pulses and raw IR values, each field width 6 for alignment
+        // Read raws (for telemetry) and compute distances in cm using calibrated function
         IRSensors ir = readIRSensors();
         long pL = encoders.readLeft();
         long pR = encoders.readRight();
-        char buf[128];
-        // Format: [I] Pulses L:  <pL> R:  <pR>  IR: L: <L> FL: <FL> B: <B> FR: <FR> R: <R>
-        // Each numeric field uses width 6 to align columns
-        snprintf(buf, sizeof(buf), "[I] Pulses L:%6ld R:%6ld  IR: L:%6d FL:%6d B:%6d FR:%6d R:%6d",
-             pL, pR, ir.rawLeft, ir.rawFrontLeft, ir.rawBack, ir.rawFrontRight, ir.rawRight);
+        unsigned long tTotal = 0;
+        float dL = distanciaSamples(IR_LEFT_SIDE_PIN, IR_NUM_SAMPLES, &tTotal);
+        float dFL = distanciaSamples(IR_FRONT_LEFT_PIN, IR_NUM_SAMPLES, &tTotal);
+        float dB = distanciaSamples(IR_BACK_CENTER_PIN, IR_NUM_SAMPLES, &tTotal);
+        float dFR = distanciaSamples(IR_FRONT_RIGHT_PIN, IR_NUM_SAMPLES, &tTotal);
+        float dR = distanciaSamples(IR_RIGHT_SIDE_PIN, IR_NUM_SAMPLES, &tTotal);
+        char buf[160];
+        // Single-line: pulses (width 6) and distances in cm with 1 decimal (width 6)
+        snprintf(buf, sizeof(buf), "[I] Pulses L:%6ld R:%6ld  Dist cm: L:%6.1f FL:%6.1f B:%6.1f FR:%6.1f R:%6.1f",
+             pL, pR, dL, dFL, dB, dFR, dR);
         Serial.println(buf);
     }
 
