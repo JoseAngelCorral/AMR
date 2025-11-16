@@ -38,6 +38,9 @@ private:
     static volatile long rightPulses;    // Contador de pulsos del encoder derecho
     // Pulsos por revolución (ajustable en runtime)
     static int pulsesPerRevolution;
+    // Flags para invertir el sentido de conteo si el encoder está cableado al revés
+    static bool leftInverted;
+    static bool rightInverted;
     
 public:
     // Inicialización del encoder
@@ -63,6 +66,12 @@ public:
     // Funciones de interrupción estáticas
     static void leftEncoderISR();
     static void rightEncoderISR();
+
+    // Ajuste del sentido (runtime)
+    static void setLeftInverted(bool inv);
+    static void setRightInverted(bool inv);
+    static bool isLeftInverted();
+    static bool isRightInverted();
     
     // Getters/Setters para configuración (runtime ajustable)
     static int getPulsesPerRevolution();

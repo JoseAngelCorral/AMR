@@ -38,17 +38,30 @@ void Odometry::update() {
     // Calcular movimiento del robot
     float deltaDistance = (deltaLeftCm + deltaRightCm) / 2.0;
     float deltaTheta = (deltaRightCm - deltaLeftCm) / WHEEL_BASE_CM;
-    
-    // Actualizar orientación
-    theta += deltaTheta;
-    
-    // Normalizar ángulo entre -π y π
-    while (theta > PI) theta -= 2 * PI;
-    while (theta < -PI) theta += 2 * PI;
-    
-    // Actualizar posición
-    x += deltaDistance * cos(theta);
-    y += deltaDistance * sin(theta);
+
+    // Guardar theta previo y calcular nueva orientación
+    float prevTheta = theta;
+    float newTheta = theta + deltaTheta;
+
+    // Normalizar nueva orientación entre -π y π
+    while (newTheta > PI) newTheta -= 2 * PI;
+    while (newTheta < -PI) newTheta += 2 * PI;
+
+    // Para integrar posición correctamente durante giros parciales, usar el
+    // ángulo medio (prevTheta + deltaTheta/2). Además, si no hay un avance
+    // significativo (p.ej. giro en sitio), no actualizar X/Y.
+    const float DIST_EPS_CM = 0.001f; // umbral para considerar movimiento nulo
+    if (fabs(deltaDistance) > DIST_EPS_CM) {
+        float midTheta = prevTheta + deltaTheta * 0.5f;
+        // normalizar midTheta en rango [-PI,PI]
+        while (midTheta > PI) midTheta -= 2 * PI;
+        while (midTheta < -PI) midTheta += 2 * PI;
+        x += deltaDistance * cos(midTheta);
+        y += deltaDistance * sin(midTheta);
+    }
+
+    // Finalmente asignar la nueva orientación normalizada
+    theta = newTheta;
     
     // Guardar lecturas para próxima iteración
     lastLeftPulses = currentLeftPulses;

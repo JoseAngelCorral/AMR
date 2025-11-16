@@ -5,6 +5,9 @@ volatile long Encoder::leftPulses = 0;
 volatile long Encoder::rightPulses = 0;
 // Pulses per revolution (runtime adjustable). Start from default measured value.
 int Encoder::pulsesPerRevolution = DEFAULT_PULSES_PER_REVOLUTION;
+// Invert flags (default: not inverted)
+bool Encoder::leftInverted = true;
+bool Encoder::rightInverted = false;
 
 void Encoder::init() {
     // Configurar pines como entrada con pull-up interno
@@ -117,11 +120,9 @@ void Encoder::leftEncoderISR() {
     bool B = digitalRead(ENCODER_LEFT_B_PIN);
     
     // Determinar dirección usando cuadratura
-    if (A == B) {
-        leftPulses--;  // Giro hacia atrás
-    } else {
-        leftPulses++;  // Giro hacia adelante
-    }
+    int delta = (A == B) ? -1 : 1; // default: A==B -> -1, else +1
+    if (Encoder::leftInverted) delta = -delta;
+    leftPulses += delta;
 }
 
 // Función de interrupción para encoder derecho
@@ -131,9 +132,12 @@ void Encoder::rightEncoderISR() {
     bool B = digitalRead(ENCODER_RIGHT_B_PIN);
     
     // Determinar dirección usando cuadratura
-    if (A == B) {
-        rightPulses--;  // Giro hacia atrás
-    } else {
-        rightPulses++;  // Giro hacia adelante
-    }
+    int delta = (A == B) ? -1 : 1;
+    if (Encoder::rightInverted) delta = -delta;
+    rightPulses += delta;
 }
+
+void Encoder::setLeftInverted(bool inv) { leftInverted = inv; }
+void Encoder::setRightInverted(bool inv) { rightInverted = inv; }
+bool Encoder::isLeftInverted() { return leftInverted; }
+bool Encoder::isRightInverted() { return rightInverted; }

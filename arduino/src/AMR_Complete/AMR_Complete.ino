@@ -61,7 +61,7 @@ struct Point { float x; float y; };
 const Point route0[] = { {0.0f,0.0f}, {30.0f,0.0f}, {30.0f,30.0f} };
 const Point route1[] = { {-10.0f,5.0f}, {0.0f,10.0f}, {10.0f,5.0f}, {0.0f,0.0f} };
 const Point route2[] = { {-10.0f,5.0f}, {0.0f,10.0f}, {10.0f,5.0f}, {0.0f,0.0f} };
-const Point route3[] = { {0.0f,0.0f}, {5.0f,0.0f}, {5.0f,5.0f} };
+const Point route3[] = { {0.0f,0.0f}, {5.0f,0.0f}, {10.0f,5.0f} };
 
 const char* routeNames[] = { "Ruta A", "Ruta B","Ruta C", "Ruta D" };
 const Point* routesPoints[] = { route0, route1, route2, route3 };
@@ -397,6 +397,7 @@ const char dashboardHTML[] PROGMEM = R"rawliteral(
         <button class="test-btn" onclick="sendCmd('T')">Test Motores (T)</button>
         <button class="test-btn" onclick="sendCmd('V')">Avanzar 1 vuelta (V)</button>
         <button class="test-btn" onclick="sendCmd('I')">Inspección (I)</button>
+        <button class="test-btn" onclick="sendCmd('R')">Reset Pos (R)</button>
     </div>
 
     <div class="status"><strong>Estado:</strong> <span id="statusText">-</span></div>
@@ -579,11 +580,12 @@ void beginNextWaypoint() {
     if (routeExec.currentPoint >= count) {
         // reached end of route
         if (!routeExec.returnModeActive) {
-            // Outbound finished: perform a 180° turn then wait for confirmation
-            routeExec.postFinishTurn = true;
-            startAutoTurn(180);
-            routeExec.state = ROUTE_TURNING;
-            Serial.println(F("Reached final waypoint: performing 180deg turn and awaiting return confirmation"));
+            // Outbound finished: wait for operator confirmation before starting return.
+            // Do NOT perform the 180deg turn now (avoid doing it twice when confirming).
+            routeExec.awaitingConfirm = true;
+            routeExec.waitingForReturnConfirm = true;
+            routeExec.state = ROUTE_WAITING;
+            Serial.println(F("Reached final waypoint: awaiting return confirmation (no auto-turn)"));
             return;
         } else {
             // Return leg finished: perform final 180° then finish route
@@ -1597,13 +1599,18 @@ void handleClient(WiFiClient client) {
         if (routeExec.active && routeExec.state == ROUTE_WAITING && routeExec.awaitingConfirm) {
             // If we are waiting specifically to start the return, enable return mode
             if (routeExec.waitingForReturnConfirm) {
+                // Operator confirmed return: enable return mode and perform the
+                // 180° turn now to face the return path. We mark postFinishTurn
+                // so handleAutoTurn will set the state appropriately when done.
                 routeExec.awaitingConfirm = false;
                 routeExec.waitingForReturnConfirm = false;
                 routeExec.returnModeActive = true;
                 routeExec.direction = -1; // run return
-                routeExec.currentPoint = 0; // start return from last waypoint
-                Serial.println(F("Return confirmed by operator - starting return"));
-                beginNextWaypoint();
+                routeExec.currentPoint = 0; // start return from last waypoint index
+                routeExec.postFinishTurn = true;
+                startAutoTurn(180);
+                routeExec.state = ROUTE_TURNING;
+                Serial.println(F("Return confirmed by operator - performing 180deg turn to start return"));
                 client.println(F("HTTP/1.1 200 OK\r\nConnection: close\r\n\r\nCONFIRMED_RETURN"));
             } else {
                 // normal confirm to start scheduled route
