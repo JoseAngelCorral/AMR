@@ -953,35 +953,16 @@ void loop() {
     // inspección rápida pero de forma periódica hasta que se envíe 'X'.
     if (inspectionActive && (millis() - inspectionLastMillis >= INSPECTION_INTERVAL_MS)) {
         inspectionLastMillis = millis();
-        Serial.println(F("[I] Inspeccion continua: estados de pines de encoder"));
-        Serial.print(F("L_A:")); Serial.print(ENCODER_LEFT_A_PIN);
-        Serial.print(F(" val:")); Serial.print(digitalRead(ENCODER_LEFT_A_PIN));
-        Serial.print(F(" L_B:")); Serial.print(ENCODER_LEFT_B_PIN);
-        Serial.print(F(" val:")); Serial.print(digitalRead(ENCODER_LEFT_B_PIN));
-        Serial.print(F(" R_A:")); Serial.print(ENCODER_RIGHT_A_PIN);
-        Serial.print(F(" val:")); Serial.print(digitalRead(ENCODER_RIGHT_A_PIN));
-        Serial.print(F(" R_B:")); Serial.print(ENCODER_RIGHT_B_PIN);
-        Serial.print(F(" val:")); Serial.println(digitalRead(ENCODER_RIGHT_B_PIN));
-        Serial.print(F("int L_B:")); Serial.print(digitalPinToInterrupt(ENCODER_LEFT_B_PIN));
-        Serial.print(F(" int R_B:")); Serial.println(digitalPinToInterrupt(ENCODER_RIGHT_B_PIN));
-        Serial.print(F("Pulses L:")); Serial.print(encoders.readLeft());
-        Serial.print(F(" R:")); Serial.println(encoders.readRight());
-
-        // Leer y mostrar sensores IR (raw + detectado) y mostrar distancia estimada
+        // Single-line output: pulses and raw IR values, each field width 6 for alignment
         IRSensors ir = readIRSensors();
-        sendIRTelemetry(ir);
-        unsigned long tTotal = 0;
-        float dL = distanciaSamples(IR_LEFT_SIDE_PIN, IR_NUM_SAMPLES, &tTotal);
-        float dFL = distanciaSamples(IR_FRONT_LEFT_PIN, IR_NUM_SAMPLES, &tTotal);
-        float dB = distanciaSamples(IR_BACK_CENTER_PIN, IR_NUM_SAMPLES, &tTotal);
-        float dFR = distanciaSamples(IR_FRONT_RIGHT_PIN, IR_NUM_SAMPLES, &tTotal);
-        float dR = distanciaSamples(IR_RIGHT_SIDE_PIN, IR_NUM_SAMPLES, &tTotal);
-        Serial.print(F("Dist(cm) L:")); Serial.print(dL,1);
-        Serial.print(F(" FL:")); Serial.print(dFL,1);
-        Serial.print(F(" B:")); Serial.print(dB,1);
-        Serial.print(F(" FR:")); Serial.print(dFR,1);
-        Serial.print(F(" R:")); Serial.print(dR,1);
-        Serial.print(F("  LeerTiempo(ms):")); Serial.println(tTotal);
+        long pL = encoders.readLeft();
+        long pR = encoders.readRight();
+        char buf[128];
+        // Format: [I] Pulses L:  <pL> R:  <pR>  IR: L: <L> FL: <FL> B: <B> FR: <FR> R: <R>
+        // Each numeric field uses width 6 to align columns
+        snprintf(buf, sizeof(buf), "[I] Pulses L:%6ld R:%6ld  IR: L:%6d FL:%6d B:%6d FR:%6d R:%6d",
+             pL, pR, ir.rawLeft, ir.rawFrontLeft, ir.rawBack, ir.rawFrontRight, ir.rawRight);
+        Serial.println(buf);
     }
 
     delay(5); // Pequeña pausa para estabilidad
