@@ -61,12 +61,12 @@ struct Point { float x; float y; };
 const Point route0[] = { {0.0f,0.0f}, {30.0f,0.0f}, {30.0f,30.0f} };
 const Point route1[] = { {-10.0f,5.0f}, {0.0f,10.0f}, {10.0f,5.0f}, {0.0f,0.0f} };
 const Point route2[] = { {-10.0f,5.0f}, {0.0f,10.0f}, {10.0f,5.0f}, {0.0f,0.0f} };
+const Point route3[] = { {0.0f,0.0f}, {5.0f,0.0f}, {5.0f,5.0f} };
 
-const char* routeNames[] = { "Ruta A", "Ruta B","Ruta C" };
-const Point* routesPoints[] = { route0, route1, route2 };
-const int routesCounts[] = { sizeof(route0)/sizeof(route0[0]), sizeof(route1)/sizeof(route1[0]), sizeof(route2)/sizeof(route1[0]) };
-const int ROUTE_COUNT = 3;
-
+const char* routeNames[] = { "Ruta A", "Ruta B","Ruta C", "Ruta D" };
+const Point* routesPoints[] = { route0, route1, route2, route3 };
+const int routesCounts[] = { sizeof(route0)/sizeof(route0[0]), sizeof(route1)/sizeof(route1[0]), sizeof(route2)/sizeof(route1[0]), sizeof(route3)/sizeof(route3[0]) };
+const int ROUTE_COUNT = 4;
 
 // ----------------------
 // Routes UI page (serves the dropdown HTML)
