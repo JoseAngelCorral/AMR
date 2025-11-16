@@ -516,6 +516,9 @@ struct RouteExecution {
     int currentPoint = 0; // 0..(n-1)
     RouteState state = ROUTE_IDLE;
     bool awaitingConfirm = false;
+    bool waitingForReturnConfirm = false; // waiting confirmation after finishing ida
+    bool returnModeActive = false; // true when executing return leg
+    bool postFinishTurn = false; // indicates we've started the final 180° turn
     // movement bookkeeping
     long moveStartLeft = 0;
     long moveStartRight = 0;
@@ -546,12 +549,22 @@ void beginNextWaypoint() {
     if (idx < 0 || idx >= ROUTE_COUNT) { stopRouteExecution(); return; }
     int count = routesCounts[idx];
     if (routeExec.currentPoint >= count) {
-        // finished
-        routeExec.active = false;
-        routeExec.state = ROUTE_DONE;
-        motors.stop();
-        Serial.println(F("Route finished"));
-        return;
+        // reached end of route
+        if (!routeExec.returnModeActive) {
+            // Outbound finished: perform a 180° turn then wait for confirmation
+            routeExec.postFinishTurn = true;
+            startAutoTurn(180);
+            routeExec.state = ROUTE_TURNING;
+            Serial.println(F("Reached final waypoint: performing 180deg turn and awaiting return confirmation"));
+            return;
+        } else {
+            // Return leg finished: perform final 180° then finish route
+            routeExec.postFinishTurn = true;
+            startAutoTurn(180);
+            routeExec.state = ROUTE_TURNING;
+            Serial.println(F("Return leg finished: performing final 180deg turn and ending route"));
+            return;
+        }
     }
 
     int pIndex = (routeExec.direction == 1) ? routeExec.currentPoint : (count - 1 - routeExec.currentPoint);
@@ -1299,6 +1312,25 @@ void handleAutoTurn() {
         motors.stop();
         turningInProgress = false;
         Serial.println(F("OK"));
+        // If this was a post-finish 180° turn, handle waiting/finishing logic
+        if (routeExec.postFinishTurn) {
+            routeExec.postFinishTurn = false;
+            if (!routeExec.returnModeActive) {
+                // We completed the 180° after outbound: wait for confirmation to start return
+                routeExec.awaitingConfirm = true;
+                routeExec.waitingForReturnConfirm = true;
+                routeExec.state = ROUTE_WAITING;
+                Serial.println(F("Awaiting confirmation to start return"));
+                return;
+            } else {
+                // We completed the 180° after return: finish route
+                routeExec.active = false;
+                routeExec.state = ROUTE_DONE;
+                Serial.println(F("Route and return complete"));
+                return;
+            }
+        }
+
         return;
     }
 
@@ -1420,10 +1452,22 @@ void handleClient(WiFiClient client) {
     // Confirm scheduled route start early: /confirm_route
     if (req.indexOf("GET /confirm_route") >= 0) {
         if (routeExec.active && routeExec.state == ROUTE_WAITING && routeExec.awaitingConfirm) {
-            routeExec.awaitingConfirm = false;
-            // start immediately
-            beginNextWaypoint();
-            client.println(F("HTTP/1.1 200 OK\r\nConnection: close\r\n\r\nCONFIRMED"));
+            // If we are waiting specifically to start the return, enable return mode
+            if (routeExec.waitingForReturnConfirm) {
+                routeExec.awaitingConfirm = false;
+                routeExec.waitingForReturnConfirm = false;
+                routeExec.returnModeActive = true;
+                routeExec.direction = -1; // run return
+                routeExec.currentPoint = 0; // start return from last waypoint
+                Serial.println(F("Return confirmed by operator - starting return"));
+                beginNextWaypoint();
+                client.println(F("HTTP/1.1 200 OK\r\nConnection: close\r\n\r\nCONFIRMED_RETURN"));
+            } else {
+                // normal confirm to start scheduled route
+                routeExec.awaitingConfirm = false;
+                beginNextWaypoint();
+                client.println(F("HTTP/1.1 200 OK\r\nConnection: close\r\n\r\nCONFIRMED"));
+            }
         } else {
             client.println(F("HTTP/1.1 409 Conflict\r\nConnection: close\r\n\r\nNO_SCHEDULE"));
         }
