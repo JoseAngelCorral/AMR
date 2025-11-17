@@ -6,8 +6,8 @@ volatile long Encoder::rightPulses = 0;
 // Pulses per revolution (runtime adjustable). Start from default measured value.
 int Encoder::pulsesPerRevolution = DEFAULT_PULSES_PER_REVOLUTION;
 // Invert flags (default: not inverted)
-bool Encoder::leftInverted = true;
-bool Encoder::rightInverted = false;
+bool Encoder::leftInverted = false;
+bool Encoder::rightInverted = true;
 
 void Encoder::init() {
     // Configurar pines como entrada con pull-up interno
