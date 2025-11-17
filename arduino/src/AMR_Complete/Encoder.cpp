@@ -123,6 +123,9 @@ void Encoder::leftEncoderISR() {
     int delta = (A == B) ? -1 : 1; // default: A==B -> -1, else +1
     if (Encoder::leftInverted) delta = -delta;
     leftPulses += delta;
+    int delta = (A == B) ? -1 : 1; // default: A==B -> -1, else +1
+    if (Encoder::leftInverted) delta = -delta;
+    leftPulses += delta;
 }
 
 // Función de interrupción para encoder derecho
@@ -132,6 +135,15 @@ void Encoder::rightEncoderISR() {
     bool B = digitalRead(ENCODER_RIGHT_B_PIN);
     
     // Determinar dirección usando cuadratura
+    int delta = (A == B) ? -1 : 1;
+    if (Encoder::rightInverted) delta = -delta;
+    rightPulses += delta;
+}
+
+void Encoder::setLeftInverted(bool inv) { leftInverted = inv; }
+void Encoder::setRightInverted(bool inv) { rightInverted = inv; }
+bool Encoder::isLeftInverted() { return leftInverted; }
+bool Encoder::isRightInverted() { return rightInverted; }
     int delta = (A == B) ? -1 : 1;
     if (Encoder::rightInverted) delta = -delta;
     rightPulses += delta;
