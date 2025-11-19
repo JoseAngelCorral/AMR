@@ -741,17 +741,17 @@ String getLogsText() {
 // y que el valor aumenta cuando detectan un objeto. Ajusta el umbral según
 // tu modelo de sensor y condiciones de iluminación.
 
-// Mapeo de pines (según indicación del usuario):
-// LEFT_SIDE (lateral izquierdo)  -> A0
-// FRONT_LEFT (frontal izquierdo) -> A1
-// BACK_CENTER (trasero central)  -> A2
-// FRONT_RIGHT (frontal derecho)  -> A4
-// RIGHT_SIDE (lateral derecho)   -> A5
-const int IR_LEFT_SIDE_PIN   = A0; // Lateral izquierdo
-const int IR_FRONT_LEFT_PIN  = A1; // Frontal izquierdo
+// Mapeo de pines (ajustado: swap L<->R)
+// LEFT_SIDE (lateral izquierdo)  -> A5 (antes A0)
+// FRONT_LEFT (frontal izquierdo) -> A4 (antes A1)
+// BACK_CENTER (trasero central)  -> A2 (sin cambios)
+// FRONT_RIGHT (frontal derecho)  -> A1 (antes A4)
+// RIGHT_SIDE (lateral derecho)   -> A0 (antes A5)
+const int IR_LEFT_SIDE_PIN   = A5; // Lateral izquierdo (swapped)
+const int IR_FRONT_LEFT_PIN  = A4; // Frontal izquierdo (swapped)
 const int IR_BACK_CENTER_PIN = A2; // Trasero central
-const int IR_FRONT_RIGHT_PIN = A4; // Frontal derecho
-const int IR_RIGHT_SIDE_PIN  = A5; // Lateral derecho
+const int IR_FRONT_RIGHT_PIN = A1; // Frontal derecho (swapped)
+const int IR_RIGHT_SIDE_PIN  = A0; // Lateral derecho (swapped)
 
 // Parámetros de lectura
 const int IR_NUM_SAMPLES = 6;      // número de lecturas para promediar
